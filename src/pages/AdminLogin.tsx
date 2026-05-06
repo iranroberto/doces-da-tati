@@ -30,7 +30,7 @@ const AdminLogin = () => {
           </div>
           <CardTitle className="font-display text-xl">Painel Admin</CardTitle>
           <p className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
-            <Sparkles className="h-3 w-3" /> doce da tati
+            <Sparkles className="h-3 w-3" /> doces da tati
           </p>
         </CardHeader>
         <CardContent>

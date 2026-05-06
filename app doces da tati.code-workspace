@@ -1,0 +1,11 @@
+{
+  "folders": [
+    {
+      "name": "app doces da tati",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "liveServer.settings.root": "dist"
+  }
+}

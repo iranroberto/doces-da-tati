@@ -21,7 +21,7 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
     amount: cartTotal,
     receiverName: config.pixReceiverName,
     city: config.pixCity,
-    description: "Pedido doce da tati",
+    description: "Pedido doces da tati",
     txid: `TATI${Math.round(cartTotal * 100)}`,
   });
   const pixQrUrl = pixPayload

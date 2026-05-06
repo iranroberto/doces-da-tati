@@ -77,12 +77,12 @@ const DEFAULT_PRODUCTS: Product[] = [
 ];
 
 const DEFAULT_CONFIG: StoreConfig = {
-  name: "doce da tati",
-  logo: "/logo-doce-da-tati-round.png",
+  name: "doces da tati",
+  logo: "/logo-doces-da-tati-round.png",
   banner: "",
   whatsapp: "5521968682297",
   pixKey: "",
-  pixReceiverName: "DOCE DA TATI",
+  pixReceiverName: "DOCES DA TATI",
   pixCity: "RIO DE JANEIRO",
   adminPassword: "bryan15",
 };

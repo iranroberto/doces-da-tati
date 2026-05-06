@@ -53,10 +53,10 @@ const AdminDashboard = () => {
   const saveStoreSettings = () => {
     setConfig({
       ...config,
-      name: storeName.trim() || "doce da tati",
+      name: storeName.trim() || "doces da tati",
       whatsapp,
       pixKey: pixKey.trim(),
-      pixReceiverName: pixReceiverName.trim() || "DOCE DA TATI",
+      pixReceiverName: pixReceiverName.trim() || "DOCES DA TATI",
       pixCity: pixCity.trim() || "RIO DE JANEIRO",
       adminPassword: adminPw || "bryan15",
     });
@@ -185,7 +185,7 @@ const AdminDashboard = () => {
                 </div>
                 <div>
                   <Label>Nome de quem recebe o Pix</Label>
-                  <Input placeholder="DOCE DA TATI" value={pixReceiverName} onChange={e => setPixReceiverName(e.target.value)} />
+                  <Input placeholder="DOCES DA TATI" value={pixReceiverName} onChange={e => setPixReceiverName(e.target.value)} />
                 </div>
                 <div>
                   <Label>Cidade do Pix</Label>
