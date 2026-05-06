@@ -63,7 +63,7 @@ const AdminDashboard = () => {
     try {
       await setConfig({
         ...config,
-        name: storeName.trim() || "doces da tati",
+        name: storeName.trim(),
         whatsapp,
         pixKey: pixKey.trim(),
         pixReceiverName: pixReceiverName.trim() || "DOCES DA TATI",
