@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Fredoka+One&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 34 38% 97%;
+    --foreground: 338 24% 16%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 338 24% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 338 24% 16%;
+
+    --primary: 336 72% 46%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 42 93% 62%;
+    --secondary-foreground: 338 24% 16%;
+
+    --muted: 28 26% 91%;
+    --muted-foreground: 338 10% 43%;
+
+    --accent: 174 58% 36%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 28 22% 86%;
+    --input: 28 22% 86%;
+    --ring: 336 72% 46%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 15 20% 12%;
+    --sidebar-foreground: 40 30% 95%;
+    --sidebar-primary: 4 80% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 15 15% 20%;
+    --sidebar-accent-foreground: 40 30% 95%;
+    --sidebar-border: 15 15% 22%;
+    --sidebar-ring: 4 80% 52%;
+
+    --promo: 336 72% 46%;
+    --promo-foreground: 0 0% 100%;
+    --highlight: 50 100% 50%;
+  }
+
+  .dark {
+    --background: 15 20% 8%;
+    --foreground: 40 30% 95%;
+    --card: 15 18% 12%;
+    --card-foreground: 40 30% 95%;
+    --popover: 15 18% 12%;
+    --popover-foreground: 40 30% 95%;
+    --primary: 4 80% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 38 90% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 15 15% 18%;
+    --muted-foreground: 30 10% 55%;
+    --accent: 25 85% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 15 15% 22%;
+    --input: 15 15% 22%;
+    --ring: 4 80% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Poppins', sans-serif;
+  }
+}
