@@ -91,6 +91,15 @@ const AdminDashboard = () => {
     }
   };
 
+  const removeLogo = async () => {
+    try {
+      await setConfig({ ...config, logo: "" });
+      toast.success("Logo removida!");
+    } catch {
+      toast.error("Nao foi possivel remover a logo no banco online");
+    }
+  };
+
   const openNewProduct = () => {
     setEditingProduct(null);
     setPName("");
@@ -242,6 +251,11 @@ const AdminDashboard = () => {
                   <Label>Logo da Loja</Label>
                   <Input type="file" accept="image/*" onChange={handleLogoUpload} />
                   {config.logo && <img src={config.logo} alt="Logo" className="mt-2 h-20 w-20 rounded-full border object-cover" />}
+                  {config.logo && (
+                    <Button variant="outline" className="mt-3 gap-2 text-destructive" onClick={removeLogo}>
+                      <Trash2 className="h-4 w-4" /> Remover logo
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
