@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, Image, LogOut, Package, Pencil, Plus, Save, Store, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -24,7 +24,7 @@ const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
 const AdminDashboard = () => {
-  const { config, setConfig, products, setProducts, logout, isAdmin } = useStore();
+  const { config, setConfig, products, setProducts, deleteProduct, logout, isAdmin, isLoading } = useStore();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"store" | "products">("store");
 
@@ -45,32 +45,49 @@ const AdminDashboard = () => {
   const [pPromo, setPPromo] = useState(false);
   const [pStock, setPStock] = useState("20");
 
+  useEffect(() => {
+    setStoreName(config.name);
+    setWhatsapp(config.whatsapp);
+    setPixKey(config.pixKey);
+    setPixReceiverName(config.pixReceiverName);
+    setPixCity(config.pixCity);
+    setAdminPw(config.adminPassword);
+  }, [config]);
+
   if (!isAdmin) {
     navigate("/admin");
     return null;
   }
 
-  const saveStoreSettings = () => {
-    setConfig({
-      ...config,
-      name: storeName.trim() || "doces da tati",
-      whatsapp,
-      pixKey: pixKey.trim(),
-      pixReceiverName: pixReceiverName.trim() || "DOCES DA TATI",
-      pixCity: pixCity.trim() || "RIO DE JANEIRO",
-      adminPassword: adminPw || "bryan15",
-    });
-    setSaveMessage("Configuracoes salvas com sucesso!");
-    toast.success("Configuracoes salvas!");
-    window.setTimeout(() => setSaveMessage(""), 3500);
+  const saveStoreSettings = async () => {
+    try {
+      await setConfig({
+        ...config,
+        name: storeName.trim() || "doces da tati",
+        whatsapp,
+        pixKey: pixKey.trim(),
+        pixReceiverName: pixReceiverName.trim() || "DOCES DA TATI",
+        pixCity: pixCity.trim() || "RIO DE JANEIRO",
+        adminPassword: adminPw || "bryan15",
+      });
+      setSaveMessage("Configuracoes salvas com sucesso!");
+      toast.success("Configuracoes salvas!");
+      window.setTimeout(() => setSaveMessage(""), 3500);
+    } catch {
+      toast.error("Nao foi possivel salvar no banco online");
+    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const b64 = await fileToBase64(file);
-      setConfig({ ...config, logo: b64 });
-      toast.success("Logo atualizado!");
+      try {
+        await setConfig({ ...config, logo: b64 });
+        toast.success("Logo atualizado!");
+      } catch {
+        toast.error("Nao foi possivel salvar a logo no banco online");
+      }
     }
   };
 
@@ -101,7 +118,7 @@ const AdminDashboard = () => {
     if (file) setPImage(await fileToBase64(file));
   };
 
-  const saveProduct = () => {
+  const saveProduct = async () => {
     const price = Number(pPrice);
 
     if (!pName.trim() || !pPrice || Number.isNaN(price)) {
@@ -119,20 +136,28 @@ const AdminDashboard = () => {
       stock: Math.max(0, parseInt(pStock, 10) || 0),
     };
 
-    if (editingProduct) {
-      setProducts(products.map(p => p.id === editingProduct.id ? productData : p));
-      toast.success("Produto atualizado!");
-    } else {
-      setProducts([...products, productData]);
-      toast.success("Produto adicionado!");
-    }
+    try {
+      if (editingProduct) {
+        await setProducts(products.map(p => p.id === editingProduct.id ? productData : p));
+        toast.success("Produto atualizado!");
+      } else {
+        await setProducts([...products, productData]);
+        toast.success("Produto adicionado!");
+      }
 
-    setDialogOpen(false);
+      setDialogOpen(false);
+    } catch {
+      toast.error("Nao foi possivel salvar o produto no banco online");
+    }
   };
 
-  const deleteProduct = (id: string) => {
-    setProducts(products.filter(p => p.id !== id));
-    toast.success("Produto excluido!");
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      await deleteProduct(id);
+      toast.success("Produto excluido!");
+    } catch {
+      toast.error("Nao foi possivel excluir o produto no banco online");
+    }
   };
 
   const handleLogout = () => {
@@ -157,6 +182,12 @@ const AdminDashboard = () => {
       </header>
 
       <div className="container mx-auto px-4 py-4">
+        {isLoading && (
+          <div className="mb-4 rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+            Carregando dados online...
+          </div>
+        )}
+
         <div className="mb-6 flex flex-wrap gap-2">
           <Button variant={tab === "store" ? "default" : "outline"} className="gap-2" onClick={() => setTab("store")}>
             <Store className="h-4 w-4" /> Loja
@@ -238,7 +269,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="flex gap-1">
                       <Button variant="outline" size="icon" onClick={() => openEditProduct(p)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="outline" size="icon" className="text-destructive" onClick={() => deleteProduct(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="icon" className="text-destructive" onClick={() => handleDeleteProduct(p.id)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </CardContent>
                 </Card>
