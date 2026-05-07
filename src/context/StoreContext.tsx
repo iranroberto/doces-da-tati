@@ -1,9 +1,15 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { CartItem, Product, StoreConfig } from "@/types/store";
+import { CartItem, Category, Product, StoreConfig } from "@/types/store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const productImage = (fileName: string) => fileName ? `/produtos/${fileName}` : "";
 const STORE_CONFIG_ID = "main";
+const DEFAULT_LOGO = "/logo-doces-da-tati-round.png?v=20260506-1";
+
+const normalizeLogo = (logo: unknown) => {
+  const value = String(logo ?? "");
+  return value === "/logo-doces-da-tati-round.png" ? DEFAULT_LOGO : value;
+};
 
 const DEFAULT_PRODUCTS: Product[] = [
   {
@@ -13,6 +19,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     description:
       "Cremosa, refrescante e com o equilibrio perfeito entre doce e azedinho. Simplesmente irresistivel!",
     image: productImage("torta-de-limao.png"),
+    categoryId: "bolos",
     isPromo: true,
     stock: 10,
   },
@@ -23,6 +30,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     description:
       "Camadas deliciosas com creme suave e morangos fresquinhos. Leve e apaixonante!",
     image: productImage("pave-de-morango.png"),
+    categoryId: "doces",
     isPromo: false,
     stock: 10,
   },
@@ -33,6 +41,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     description:
       "Fresquinho, leve e bem recheado. Perfeito pra um lanche saudavel e saboroso!",
     image: productImage("sanduiche-natural-de-frango.png"),
+    categoryId: "salgados",
     isPromo: true,
     stock: 10,
   },
@@ -43,6 +52,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     description:
       "Massa macia com recheio cremoso de frango bem temperado. Sabor de comida caseira!",
     image: productImage("torta-de-frango.png"),
+    categoryId: "salgados",
     isPromo: false,
     stock: 10,
   },
@@ -53,6 +63,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     description:
       "Classico que todo mundo ama! Camadas de creme com bolacha bem molhadinha.",
     image: productImage("pave-de-bolacha.png"),
+    categoryId: "doces",
     isPromo: false,
     stock: 10,
   },
@@ -63,6 +74,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     description:
       "Leve, geladinho e com aquele azedinho na medida certa. Refrescante e delicioso!",
     image: productImage("mousse-de-limao.png"),
+    categoryId: "doces",
     isPromo: true,
     stock: 10,
   },
@@ -73,14 +85,21 @@ const DEFAULT_PRODUCTS: Product[] = [
     description:
       "Super cremoso, com sabor marcante e equilibrado. Perfeito pra qualquer hora!",
     image: productImage("mousse-de-maracuja.png"),
+    categoryId: "doces",
     isPromo: true,
     stock: 10,
   },
 ];
 
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: "doces", name: "Doces", isActive: true },
+  { id: "bolos", name: "Bolos", isActive: true },
+  { id: "salgados", name: "Salgados", isActive: true },
+];
+
 const DEFAULT_CONFIG: StoreConfig = {
   name: "doces da tati",
-  logo: "/logo-doces-da-tati-round.png",
+  logo: DEFAULT_LOGO,
   banner: "",
   whatsapp: "5521968682297",
   pixKey: "",
@@ -104,6 +123,7 @@ const productFromRow = (row: Record<string, unknown>): Product => ({
   price: Number(row.price ?? 0),
   description: String(row.description ?? ""),
   image: String(row.image ?? ""),
+  categoryId: String(row.category_id ?? ""),
   isPromo: Boolean(row.is_promo),
   stock: Number(row.stock ?? 0),
 });
@@ -114,15 +134,30 @@ const productToRow = (product: Product, sortOrder: number) => ({
   price: product.price,
   description: product.description,
   image: product.image,
+  category_id: product.categoryId,
   is_promo: product.isPromo,
   stock: product.stock,
   sort_order: sortOrder,
   updated_at: new Date().toISOString(),
 });
 
+const categoryFromRow = (row: Record<string, unknown>): Category => ({
+  id: String(row.id),
+  name: String(row.name ?? ""),
+  isActive: Boolean(row.is_active ?? true),
+});
+
+const categoryToRow = (category: Category, sortOrder: number) => ({
+  id: category.id,
+  name: category.name,
+  is_active: category.isActive,
+  sort_order: sortOrder,
+  updated_at: new Date().toISOString(),
+});
+
 const configFromRow = (row: Record<string, unknown>): StoreConfig => ({
   name: String(row.name ?? DEFAULT_CONFIG.name),
-  logo: String(row.logo ?? DEFAULT_CONFIG.logo),
+  logo: normalizeLogo(row.logo ?? DEFAULT_CONFIG.logo),
   banner: String(row.banner ?? DEFAULT_CONFIG.banner),
   whatsapp: String(row.whatsapp ?? DEFAULT_CONFIG.whatsapp),
   pixKey: String(row.pix_key ?? DEFAULT_CONFIG.pixKey),
@@ -147,6 +182,9 @@ const configToRow = (config: StoreConfig) => ({
 interface StoreContextType {
   config: StoreConfig;
   setConfig: (c: StoreConfig) => Promise<void>;
+  categories: Category[];
+  setCategories: (c: Category[]) => Promise<void>;
+  deleteCategory: (categoryId: string) => Promise<void>;
   products: Product[];
   setProducts: (p: Product[]) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
@@ -166,36 +204,52 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | null>(null);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [config, setConfigState] = useState<StoreConfig>(() => load("store_config", DEFAULT_CONFIG));
+  const [config, setConfigState] = useState<StoreConfig>(() => {
+    const storedConfig = load("store_config", DEFAULT_CONFIG);
+    return { ...storedConfig, logo: normalizeLogo(storedConfig.logo) };
+  });
+  const [categories, setCategoriesState] = useState<Category[]>(() => load("store_categories", DEFAULT_CATEGORIES));
   const [products, setProductsState] = useState<Product[]>(() => load("store_products", DEFAULT_PRODUCTS));
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem("admin") === "1");
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
 
-  const persistLocal = useCallback((nextConfig: StoreConfig, nextProducts: Product[]) => {
+  const persistLocal = useCallback((nextConfig: StoreConfig, nextCategories: Category[], nextProducts: Product[]) => {
     localStorage.setItem("store_config", JSON.stringify(nextConfig));
+    localStorage.setItem("store_categories", JSON.stringify(nextCategories));
     localStorage.setItem("store_products", JSON.stringify(nextProducts));
   }, []);
 
   const loadRemoteData = useCallback(async () => {
     if (!supabase) return;
 
-    const [configResult, productsResult] = await Promise.all([
+    const [configResult, categoriesResult, productsResult] = await Promise.all([
       supabase.from("store_config").select("*").eq("id", STORE_CONFIG_ID).maybeSingle(),
+      supabase.from("categories").select("*").order("sort_order", { ascending: true }),
       supabase.from("products").select("*").order("sort_order", { ascending: true }),
     ]);
 
     if (configResult.error) throw configResult.error;
+    if (categoriesResult.error) throw categoriesResult.error;
     if (productsResult.error) throw productsResult.error;
 
     let nextConfig = configResult.data ? configFromRow(configResult.data) : config;
+    let nextCategories = categoriesResult.data?.length ? categoriesResult.data.map(categoryFromRow) : categories;
     let nextProducts = productsResult.data?.length ? productsResult.data.map(productFromRow) : products;
 
     if (!configResult.data) {
-      const fallbackConfig = load("store_config", DEFAULT_CONFIG);
+      const storedFallbackConfig = load("store_config", DEFAULT_CONFIG);
+      const fallbackConfig = { ...storedFallbackConfig, logo: normalizeLogo(storedFallbackConfig.logo) };
       const { error } = await supabase.from("store_config").upsert(configToRow(fallbackConfig));
       if (error) throw error;
       nextConfig = fallbackConfig;
+    }
+
+    if (!categoriesResult.data?.length) {
+      const fallbackCategories = load("store_categories", DEFAULT_CATEGORIES);
+      const { error } = await supabase.from("categories").upsert(fallbackCategories.map(categoryToRow));
+      if (error) throw error;
+      nextCategories = fallbackCategories;
     }
 
     if (!productsResult.data?.length) {
@@ -206,9 +260,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     setConfigState(nextConfig);
+    setCategoriesState(nextCategories);
     setProductsState(nextProducts);
-    persistLocal(nextConfig, nextProducts);
-  }, [config, persistLocal, products]);
+    persistLocal(nextConfig, nextCategories, nextProducts);
+  }, [categories, config, persistLocal, products]);
 
   useEffect(() => {
     if (!supabase) {
@@ -238,6 +293,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .on("postgres_changes", { event: "*", schema: "public", table: "store_config" }, () => {
         void loadRemoteData();
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => {
+        void loadRemoteData();
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
         void loadRemoteData();
       })
@@ -254,6 +312,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (!supabase) return;
     const { error } = await supabase.from("store_config").upsert(configToRow(nextConfig));
+    if (error) throw error;
+  }, []);
+
+  const setCategories = useCallback(async (nextCategories: Category[]) => {
+    setCategoriesState(nextCategories);
+    localStorage.setItem("store_categories", JSON.stringify(nextCategories));
+
+    if (!supabase) return;
+    const { error } = await supabase.from("categories").upsert(nextCategories.map(categoryToRow));
     if (error) throw error;
   }, []);
 
@@ -275,6 +342,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const { error } = await supabase.from("products").delete().eq("id", productId);
     if (error) throw error;
   }, [products]);
+
+  const deleteCategory = useCallback(async (categoryId: string) => {
+    const nextCategories = categories.filter(category => category.id !== categoryId);
+    const nextProducts = products.map(product =>
+      product.categoryId === categoryId ? { ...product, categoryId: "" } : product
+    );
+
+    setCategoriesState(nextCategories);
+    setProductsState(nextProducts);
+    localStorage.setItem("store_categories", JSON.stringify(nextCategories));
+    localStorage.setItem("store_products", JSON.stringify(nextProducts));
+
+    if (!supabase) return;
+    const [{ error: productError }, { error: categoryError }] = await Promise.all([
+      supabase.from("products").upsert(nextProducts.map(productToRow)),
+      supabase.from("categories").delete().eq("id", categoryId),
+    ]);
+    if (productError) throw productError;
+    if (categoryError) throw categoryError;
+  }, [categories, products]);
 
   const addToCart = useCallback((product: Product) => {
     if (product.stock <= 0) return;
@@ -321,7 +408,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   return (
-    <StoreContext.Provider value={{ config, setConfig, products, setProducts, deleteProduct, isLoading, cart, addToCart, removeFromCart, updateCartQty, clearCart, cartTotal, cartCount, isAdmin, login, logout }}>
+    <StoreContext.Provider value={{ config, setConfig, categories, setCategories, deleteCategory, products, setProducts, deleteProduct, isLoading, cart, addToCart, removeFromCart, updateCartQty, clearCart, cartTotal, cartCount, isAdmin, login, logout }}>
       {children}
     </StoreContext.Provider>
   );

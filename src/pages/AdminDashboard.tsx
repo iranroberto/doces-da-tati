@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, Image, LogOut, Package, Pencil, Plus, Save, Store, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Image, LogOut, Package, Pencil, Plus, Save, Store, Tags, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Product } from "@/types/store";
+import { Category, Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,10 +23,18 @@ const fileToBase64 = (file: File): Promise<string> =>
 const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
+const slugify = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 const AdminDashboard = () => {
-  const { config, setConfig, products, setProducts, deleteProduct, logout, isAdmin, isLoading } = useStore();
+  const { config, setConfig, categories, setCategories, deleteCategory, products, setProducts, deleteProduct, logout, isAdmin, isLoading } = useStore();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"store" | "products">("store");
+  const [tab, setTab] = useState<"store" | "categories" | "products">("store");
 
   const [storeName, setStoreName] = useState(config.name);
   const [whatsapp, setWhatsapp] = useState(config.whatsapp);
@@ -42,8 +50,12 @@ const AdminDashboard = () => {
   const [pPrice, setPPrice] = useState("");
   const [pDesc, setPDesc] = useState("");
   const [pImage, setPImage] = useState("");
+  const [pCategoryId, setPCategoryId] = useState("");
   const [pPromo, setPPromo] = useState(false);
   const [pStock, setPStock] = useState("20");
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryActive, setCategoryActive] = useState(true);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   useEffect(() => {
     setStoreName(config.name);
@@ -106,6 +118,7 @@ const AdminDashboard = () => {
     setPPrice("");
     setPDesc("");
     setPImage("");
+    setPCategoryId(categories.find(category => category.isActive)?.id || "");
     setPPromo(false);
     setPStock("20");
     setDialogOpen(true);
@@ -117,6 +130,7 @@ const AdminDashboard = () => {
     setPPrice(String(p.price));
     setPDesc(p.description);
     setPImage(p.image);
+    setPCategoryId(p.categoryId);
     setPPromo(p.isPromo);
     setPStock(String(p.stock));
     setDialogOpen(true);
@@ -141,6 +155,7 @@ const AdminDashboard = () => {
       price,
       description: pDesc,
       image: pImage,
+      categoryId: pCategoryId,
       isPromo: pPromo,
       stock: Math.max(0, parseInt(pStock, 10) || 0),
     };
@@ -157,6 +172,58 @@ const AdminDashboard = () => {
       setDialogOpen(false);
     } catch {
       toast.error("Nao foi possivel salvar o produto no banco online");
+    }
+  };
+
+  const resetCategoryForm = () => {
+    setEditingCategory(null);
+    setCategoryName("");
+    setCategoryActive(true);
+  };
+
+  const openEditCategory = (category: Category) => {
+    setEditingCategory(category);
+    setCategoryName(category.name);
+    setCategoryActive(category.isActive);
+  };
+
+  const saveCategory = async () => {
+    const name = categoryName.trim();
+    const id = editingCategory?.id || slugify(name);
+
+    if (!name || !id) {
+      toast.error("Informe o nome da categoria");
+      return;
+    }
+
+    if (!editingCategory && categories.some(category => category.id === id)) {
+      toast.error("Ja existe uma categoria com esse nome");
+      return;
+    }
+
+    const categoryData: Category = { id, name, isActive: categoryActive };
+
+    try {
+      if (editingCategory) {
+        await setCategories(categories.map(category => category.id === editingCategory.id ? categoryData : category));
+        toast.success("Categoria atualizada!");
+      } else {
+        await setCategories([...categories, categoryData]);
+        toast.success("Categoria adicionada!");
+      }
+      resetCategoryForm();
+    } catch {
+      toast.error("Nao foi possivel salvar a categoria no banco online");
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      await deleteCategory(id);
+      if (editingCategory?.id === id) resetCategoryForm();
+      toast.success("Categoria excluida!");
+    } catch {
+      toast.error("Nao foi possivel excluir a categoria no banco online");
     }
   };
 
@@ -200,6 +267,9 @@ const AdminDashboard = () => {
         <div className="mb-6 flex flex-wrap gap-2">
           <Button variant={tab === "store" ? "default" : "outline"} className="gap-2" onClick={() => setTab("store")}>
             <Store className="h-4 w-4" /> Loja
+          </Button>
+          <Button variant={tab === "categories" ? "default" : "outline"} className="gap-2" onClick={() => setTab("categories")}>
+            <Tags className="h-4 w-4" /> Categorias ({categories.length})
           </Button>
           <Button variant={tab === "products" ? "default" : "outline"} className="gap-2" onClick={() => setTab("products")}>
             <Package className="h-4 w-4" /> Produtos ({products.length})
@@ -262,6 +332,61 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {tab === "categories" && (
+          <div className="grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+            <Card className="rounded-lg">
+              <CardHeader><CardTitle>{editingCategory ? "Editar Categoria" : "Nova Categoria"}</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Nome da Categoria</Label>
+                  <Input value={categoryName} onChange={e => setCategoryName(e.target.value)} placeholder="Ex.: Bolos" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={categoryActive} onCheckedChange={setCategoryActive} />
+                  <Label>Categoria ativa</Label>
+                </div>
+                <div className="flex gap-2">
+                  <Button className="flex-1 gap-2" onClick={saveCategory}><Save className="h-4 w-4" /> Salvar</Button>
+                  {editingCategory && <Button variant="outline" onClick={resetCategoryForm}>Cancelar</Button>}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-3">
+              {categories.length === 0 ? (
+                <Card className="rounded-lg">
+                  <CardContent className="py-10 text-center text-muted-foreground">Nenhuma categoria cadastrada.</CardContent>
+                </Card>
+              ) : categories.map(category => {
+                const productCount = products.filter(product => product.categoryId === category.id).length;
+
+                return (
+                  <Card key={category.id} className="rounded-lg">
+                    <CardContent className="flex items-center gap-4 p-4">
+                      <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Tags className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate font-bold">{category.name}</p>
+                          <span className={category.isActive ? "rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700" : "rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground"}>
+                            {category.isActive ? "Ativa" : "Oculta"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{productCount} produto(s)</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="icon" onClick={() => openEditCategory(category)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" className="text-destructive" onClick={() => handleDeleteCategory(category.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {tab === "products" && (
           <div className="space-y-4">
             <Button className="gap-2" onClick={openNewProduct}><Plus className="h-4 w-4" /> Novo Produto</Button>
@@ -279,7 +404,9 @@ const AdminDashboard = () => {
                         {p.isPromo && <span className="rounded-full bg-promo px-2 py-0.5 text-xs text-promo-foreground">Oferta</span>}
                       </div>
                       <p className="text-sm font-bold text-primary">{formatPrice(p.price)}</p>
-                      <p className="text-xs text-muted-foreground">Estoque: {p.stock}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {categories.find(category => category.id === p.categoryId)?.name || "Sem categoria"} - Estoque: {p.stock}
+                      </p>
                     </div>
                     <div className="flex gap-1">
                       <Button variant="outline" size="icon" onClick={() => openEditProduct(p)}><Pencil className="h-4 w-4" /></Button>
@@ -302,6 +429,19 @@ const AdminDashboard = () => {
             <div><Label>Nome</Label><Input value={pName} onChange={e => setPName(e.target.value)} /></div>
             <div><Label>Preco (R$)</Label><Input type="number" step="0.01" value={pPrice} onChange={e => setPPrice(e.target.value)} /></div>
             <div><Label>Descricao</Label><Textarea value={pDesc} onChange={e => setPDesc(e.target.value)} /></div>
+            <div>
+              <Label>Categoria</Label>
+              <select
+                value={pCategoryId}
+                onChange={e => setPCategoryId(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Sem categoria</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+            </div>
             <div><Label>Estoque</Label><Input type="number" value={pStock} onChange={e => setPStock(e.target.value)} /></div>
             <div>
               <Label>Imagem</Label>

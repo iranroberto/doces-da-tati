@@ -7,8 +7,9 @@ const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
 const ProductCard = ({ product }: { product: Product }) => {
-  const { addToCart } = useStore();
+  const { addToCart, categories } = useStore();
   const isSoldOut = product.stock === 0;
+  const category = categories.find(item => item.id === product.categoryId);
 
   return (
     <article className="group relative overflow-hidden rounded-lg border border-border bg-card shadow-sm ring-1 ring-transparent transition duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:ring-primary/10">
@@ -34,6 +35,9 @@ const ProductCard = ({ product }: { product: Product }) => {
 
       <div className="space-y-3 p-4">
         <div>
+          {category && (
+            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-primary">{category.name}</p>
+          )}
           <h3 className="line-clamp-2 min-h-14 text-lg font-bold leading-tight text-card-foreground">{product.name}</h3>
           <p className="mt-1 line-clamp-2 min-h-10 text-sm text-muted-foreground">{product.description}</p>
         </div>

@@ -4,8 +4,15 @@ export interface Product {
   price: number;
   description: string;
   image: string;
+  categoryId: string;
   isPromo: boolean;
   stock: number;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  isActive: boolean;
 }
 
 export interface StoreConfig {

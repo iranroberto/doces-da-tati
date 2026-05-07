@@ -11,24 +11,28 @@ import { Input } from "@/components/ui/input";
 type ProductFilter = "all" | "promo" | "available";
 
 const Index = () => {
-  const { config, products } = useStore();
+  const { config, categories, products } = useStore();
   const [cartOpen, setCartOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ProductFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  const visibleCategories = useMemo(() => categories.filter(category => category.isActive), [categories]);
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
 
     return products.filter(product => {
       const matchesSearch = !term || [product.name, product.description].some(value => value.toLowerCase().includes(term));
+      const matchesCategory = categoryFilter === "all" || product.categoryId === categoryFilter;
       const matchesFilter =
         filter === "all" ||
         (filter === "promo" && product.isPromo) ||
         (filter === "available" && product.stock > 0);
 
-      return matchesSearch && matchesFilter;
+      return matchesSearch && matchesCategory && matchesFilter;
     });
-  }, [filter, products, search]);
+  }, [categoryFilter, filter, products, search]);
 
   const promoCount = products.filter(product => product.isPromo).length;
   const availableCount = products.filter(product => product.stock > 0).length;
@@ -120,7 +124,7 @@ const Index = () => {
           </div>
         </div>
 
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-3 flex flex-wrap gap-2">
           <Button variant={filter === "all" ? "default" : "outline"} size="sm" onClick={() => setFilter("all")}>
             Todos
           </Button>
@@ -131,6 +135,24 @@ const Index = () => {
             Disponiveis
           </Button>
         </div>
+
+        {visibleCategories.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            <Button variant={categoryFilter === "all" ? "secondary" : "outline"} size="sm" onClick={() => setCategoryFilter("all")}>
+              Todas categorias
+            </Button>
+            {visibleCategories.map(category => (
+              <Button
+                key={category.id}
+                variant={categoryFilter === category.id ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setCategoryFilter(category.id)}
+              >
+                {category.name}
+              </Button>
+            ))}
+          </div>
+        )}
 
         {products.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border bg-card py-20 text-center text-muted-foreground">
