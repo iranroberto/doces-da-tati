@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BadgePercent, Clock, MessageCircle, PackageCheck, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { BadgePercent, Clock, MessageCircle, PackageCheck, Search, ShieldCheck } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
 import CartDrawer from "@/components/CartDrawer";
 import ProductCard from "@/components/ProductCard";
@@ -84,29 +84,6 @@ const Index = () => {
       </section>
 
       <main className="container mx-auto px-4 py-8">
-        <section className="mb-8 rounded-lg border border-border bg-card p-5 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-primary">
-                <Sparkles className="h-3 w-3" /> Encomendas especiais
-              </div>
-              <h2 className="font-display text-2xl text-foreground md:text-3xl">
-                Doces para festa, lembrancinhas e pedidos do dia
-              </h2>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                Escolha seus produtos, gere Pix no carrinho ou chame pelo WhatsApp para combinar detalhes da encomenda.
-              </p>
-            </div>
-            {whatsappUrl && (
-              <Button className="gap-2 bg-green-600 font-bold text-white hover:bg-green-700" asChild>
-                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle className="h-5 w-5" /> Falar com a loja
-                </a>
-              </Button>
-            )}
-          </div>
-        </section>
-
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-primary">Cardapio</p>
