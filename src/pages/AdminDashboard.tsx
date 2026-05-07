@@ -85,7 +85,8 @@ const AdminDashboard = () => {
       setSaveMessage("Configuracoes salvas com sucesso!");
       toast.success("Configuracoes salvas!");
       window.setTimeout(() => setSaveMessage(""), 3500);
-    } catch {
+    } catch (error) {
+      console.error("Erro ao salvar configuracoes da loja:", error);
       toast.error("Nao foi possivel salvar no banco online");
     }
   };

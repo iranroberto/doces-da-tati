@@ -117,6 +117,14 @@ function load<T>(key: string, fallback: T): T {
   }
 }
 
+function saveLocal<T>(key: string, value: T) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`Nao foi possivel salvar ${key} no localStorage:`, error);
+  }
+}
+
 const productFromRow = (row: Record<string, unknown>): Product => ({
   id: String(row.id),
   name: String(row.name ?? ""),
@@ -215,9 +223,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
 
   const persistLocal = useCallback((nextConfig: StoreConfig, nextCategories: Category[], nextProducts: Product[]) => {
-    localStorage.setItem("store_config", JSON.stringify(nextConfig));
-    localStorage.setItem("store_categories", JSON.stringify(nextCategories));
-    localStorage.setItem("store_products", JSON.stringify(nextProducts));
+    saveLocal("store_config", nextConfig);
+    saveLocal("store_categories", nextCategories);
+    saveLocal("store_products", nextProducts);
   }, []);
 
   const loadRemoteData = useCallback(async () => {
@@ -308,7 +316,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setConfig = useCallback(async (nextConfig: StoreConfig) => {
     setConfigState(nextConfig);
-    localStorage.setItem("store_config", JSON.stringify(nextConfig));
+    saveLocal("store_config", nextConfig);
 
     if (!supabase) return;
     const { error } = await supabase.from("store_config").upsert(configToRow(nextConfig));
@@ -317,7 +325,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setCategories = useCallback(async (nextCategories: Category[]) => {
     setCategoriesState(nextCategories);
-    localStorage.setItem("store_categories", JSON.stringify(nextCategories));
+    saveLocal("store_categories", nextCategories);
 
     if (!supabase) return;
     const { error } = await supabase.from("categories").upsert(nextCategories.map(categoryToRow));
@@ -326,7 +334,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setProducts = useCallback(async (nextProducts: Product[]) => {
     setProductsState(nextProducts);
-    localStorage.setItem("store_products", JSON.stringify(nextProducts));
+    saveLocal("store_products", nextProducts);
 
     if (!supabase) return;
     const { error } = await supabase.from("products").upsert(nextProducts.map(productToRow));
@@ -336,7 +344,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteProduct = useCallback(async (productId: string) => {
     const nextProducts = products.filter(product => product.id !== productId);
     setProductsState(nextProducts);
-    localStorage.setItem("store_products", JSON.stringify(nextProducts));
+    saveLocal("store_products", nextProducts);
 
     if (!supabase) return;
     const { error } = await supabase.from("products").delete().eq("id", productId);
@@ -351,8 +359,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setCategoriesState(nextCategories);
     setProductsState(nextProducts);
-    localStorage.setItem("store_categories", JSON.stringify(nextCategories));
-    localStorage.setItem("store_products", JSON.stringify(nextProducts));
+    saveLocal("store_categories", nextCategories);
+    saveLocal("store_products", nextProducts);
 
     if (!supabase) return;
     const [{ error: productError }, { error: categoryError }] = await Promise.all([
