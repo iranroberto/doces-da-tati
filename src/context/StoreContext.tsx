@@ -125,6 +125,11 @@ function saveLocal<T>(key: string, value: T) {
   }
 }
 
+const configForLocalStorage = (config: StoreConfig): StoreConfig => ({
+  ...config,
+  logo: config.logo.startsWith("data:") ? "" : config.logo,
+});
+
 const productFromRow = (row: Record<string, unknown>): Product => ({
   id: String(row.id),
   name: String(row.name ?? ""),
@@ -223,7 +228,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
 
   const persistLocal = useCallback((nextConfig: StoreConfig, nextCategories: Category[], nextProducts: Product[]) => {
-    saveLocal("store_config", nextConfig);
+    saveLocal("store_config", configForLocalStorage(nextConfig));
     saveLocal("store_categories", nextCategories);
     saveLocal("store_products", nextProducts);
   }, []);
@@ -316,12 +321,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setConfig = useCallback(async (nextConfig: StoreConfig) => {
     setConfigState(nextConfig);
-    saveLocal("store_config", nextConfig);
+    saveLocal("store_config", configForLocalStorage(nextConfig));
 
     if (!supabase) return;
-    const { error } = await supabase.from("store_config").upsert(configToRow(nextConfig));
+    const row = configToRow(nextConfig);
+    if (nextConfig.logo === config.logo) {
+      delete (row as Partial<ReturnType<typeof configToRow>>).logo;
+    }
+
+    const { error } = await supabase.from("store_config").upsert(row);
     if (error) throw error;
-  }, []);
+  }, [config.logo]);
 
   const setCategories = useCallback(async (nextCategories: Category[]) => {
     setCategoriesState(nextCategories);
