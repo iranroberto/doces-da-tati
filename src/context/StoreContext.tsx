@@ -246,9 +246,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (categoriesResult.error) throw categoriesResult.error;
     if (productsResult.error) throw productsResult.error;
 
-    let nextConfig = configResult.data ? configFromRow(configResult.data) : config;
-    let nextCategories = categoriesResult.data?.length ? categoriesResult.data.map(categoryFromRow) : categories;
-    let nextProducts = productsResult.data?.length ? productsResult.data.map(productFromRow) : products;
+    let nextConfig = configResult.data ? configFromRow(configResult.data) : load("store_config", DEFAULT_CONFIG);
+    let nextCategories = categoriesResult.data?.length
+      ? categoriesResult.data.map(categoryFromRow)
+      : load("store_categories", DEFAULT_CATEGORIES);
+    let nextProducts = productsResult.data?.length
+      ? productsResult.data.map(productFromRow)
+      : load("store_products", DEFAULT_PRODUCTS);
 
     if (!configResult.data) {
       const storedFallbackConfig = load("store_config", DEFAULT_CONFIG);
@@ -276,7 +280,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCategoriesState(nextCategories);
     setProductsState(nextProducts);
     persistLocal(nextConfig, nextCategories, nextProducts);
-  }, [categories, config, persistLocal, products]);
+  }, [persistLocal]);
 
   useEffect(() => {
     if (!supabase) {

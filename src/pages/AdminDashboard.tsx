@@ -43,6 +43,7 @@ const AdminDashboard = () => {
   const [pixCity, setPixCity] = useState(config.pixCity);
   const [adminPw, setAdminPw] = useState(config.adminPassword);
   const [saveMessage, setSaveMessage] = useState("");
+  const [storeFormDirty, setStoreFormDirty] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -58,13 +59,15 @@ const AdminDashboard = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   useEffect(() => {
+    if (storeFormDirty) return;
+
     setStoreName(config.name);
     setWhatsapp(config.whatsapp);
     setPixKey(config.pixKey);
     setPixReceiverName(config.pixReceiverName);
     setPixCity(config.pixCity);
     setAdminPw(config.adminPassword);
-  }, [config]);
+  }, [config, storeFormDirty]);
 
   if (!isAdmin) {
     navigate("/admin");
@@ -82,6 +85,7 @@ const AdminDashboard = () => {
         pixCity: pixCity.trim() || "RIO DE JANEIRO",
         adminPassword: adminPw || "bryan15",
       });
+      setStoreFormDirty(false);
       setSaveMessage("Configuracoes salvas com sucesso!");
       toast.success("Configuracoes salvas!");
       window.setTimeout(() => setSaveMessage(""), 3500);
@@ -284,27 +288,27 @@ const AdminDashboard = () => {
               <CardContent className="space-y-4">
                 <div>
                   <Label>Nome da Loja</Label>
-                  <Input value={storeName} onChange={e => setStoreName(e.target.value)} />
+                  <Input value={storeName} onChange={e => { setStoreFormDirty(true); setStoreName(e.target.value); }} />
                 </div>
                 <div>
                   <Label>Numero do WhatsApp (com DDD)</Label>
-                  <Input placeholder="5511999999999" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} />
+                  <Input placeholder="5511999999999" value={whatsapp} onChange={e => { setStoreFormDirty(true); setWhatsapp(e.target.value); }} />
                 </div>
                 <div>
                   <Label>Chave Pix</Label>
-                  <Input placeholder="CPF, CNPJ, telefone, e-mail ou chave aleatoria" value={pixKey} onChange={e => setPixKey(e.target.value)} />
+                  <Input placeholder="CPF, CNPJ, telefone, e-mail ou chave aleatoria" value={pixKey} onChange={e => { setStoreFormDirty(true); setPixKey(e.target.value); }} />
                 </div>
                 <div>
                   <Label>Nome de quem recebe o Pix</Label>
-                  <Input placeholder="DOCES DA TATI" value={pixReceiverName} onChange={e => setPixReceiverName(e.target.value)} />
+                  <Input placeholder="DOCES DA TATI" value={pixReceiverName} onChange={e => { setStoreFormDirty(true); setPixReceiverName(e.target.value); }} />
                 </div>
                 <div>
                   <Label>Cidade do Pix</Label>
-                  <Input placeholder="RIO DE JANEIRO" value={pixCity} onChange={e => setPixCity(e.target.value)} />
+                  <Input placeholder="RIO DE JANEIRO" value={pixCity} onChange={e => { setStoreFormDirty(true); setPixCity(e.target.value); }} />
                 </div>
                 <div>
                   <Label>Senha do Admin</Label>
-                  <Input type="password" value={adminPw} onChange={e => setAdminPw(e.target.value)} />
+                  <Input type="password" value={adminPw} onChange={e => { setStoreFormDirty(true); setAdminPw(e.target.value); }} />
                 </div>
                 {saveMessage && (
                   <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
