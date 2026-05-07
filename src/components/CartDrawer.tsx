@@ -1,10 +1,7 @@
-import { Copy, MessageCircle, Minus, Package, Plus, QrCode, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { MessageCircle, Minus, Package, Plus, Trash2 } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
-import { buildPixPayload } from "@/lib/pix";
 
 interface CartDrawerProps {
   open: boolean;
@@ -16,34 +13,23 @@ const formatPrice = (value: number) =>
 
 const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
   const { cart, updateCartQty, removeFromCart, clearCart, cartTotal, config } = useStore();
-  const pixPayload = buildPixPayload({
-    key: config.pixKey,
-    amount: cartTotal,
-    receiverName: config.pixReceiverName,
-    city: config.pixCity,
-    description: "Pedido doces da tati",
-    txid: `TATI${Math.round(cartTotal * 100)}`,
-  });
-  const pixQrUrl = pixPayload
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(pixPayload)}`
-    : "";
 
-  const copyPixCode = async () => {
-    if (!pixPayload) return;
+  const finishOrder = () => {
+    const order = {
+      createdAt: new Date().toISOString(),
+      items: cart.map(item => ({
+        productId: item.product.id,
+        name: item.product.name,
+        price: item.product.price,
+        quantity: item.quantity,
+        image: item.product.image,
+      })),
+      total: cartTotal,
+    };
 
-    try {
-      await navigator.clipboard.writeText(pixPayload);
-      toast.success("Codigo Pix copiado!");
-    } catch {
-      toast.error("Nao foi possivel copiar. Selecione o codigo manualmente.");
-    }
-  };
-
-  const buildWhatsAppOrder = () => {
-    const items = cart.map(i => `- ${i.quantity}x ${i.product.name} - ${formatPrice(i.product.price * i.quantity)}`).join("\n");
-    const payment = pixPayload ? `\n\nPix copia e cola:\n${pixPayload}` : "";
-    const msg = `Ola! Gostaria de fazer o seguinte pedido:\n\n${items}\n\nTotal: ${formatPrice(cartTotal)}${payment}`;
-    return `https://wa.me/${(config.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`;
+    localStorage.setItem("pending_checkout", JSON.stringify(order));
+    window.open("/checkout", "_blank", "noopener,noreferrer");
+    onClose();
   };
 
   return (
@@ -98,30 +84,9 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
               <span>Total:</span>
               <span className="text-primary">{formatPrice(cartTotal)}</span>
             </div>
-            {pixPayload && (
-              <div className="w-full rounded-lg border border-border bg-card p-3 text-left">
-                <div className="mb-3 flex items-center gap-2 font-bold text-card-foreground">
-                  <QrCode className="h-4 w-4 text-primary" /> Pagar com Pix
-                </div>
-                <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
-                  <img src={pixQrUrl} alt="QR Code Pix" className="mx-auto h-28 w-28 rounded-md border bg-white p-1" />
-                  <div className="space-y-2">
-                    <Textarea value={pixPayload} readOnly className="h-24 resize-none text-xs" />
-                    <Button type="button" variant="outline" size="sm" className="w-full gap-2" onClick={copyPixCode}>
-                      <Copy className="h-4 w-4" /> Copiar codigo Pix
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {!pixPayload && (
-              <p className="text-center text-sm text-muted-foreground">Configure a chave Pix no painel admin para gerar codigo e QR Code.</p>
-            )}
             {config.whatsapp ? (
-              <Button className="w-full gap-2 bg-green-600 text-base font-bold text-white hover:bg-green-700" asChild>
-                <a href={buildWhatsAppOrder()} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle className="h-5 w-5" /> Finalizar pelo WhatsApp
-                </a>
+              <Button className="w-full gap-2 bg-green-600 text-base font-bold text-white hover:bg-green-700" onClick={finishOrder}>
+                <MessageCircle className="h-5 w-5" /> Finalizar Pedido
               </Button>
             ) : (
               <p className="text-center text-sm text-muted-foreground">Configure o WhatsApp no painel admin para finalizar pedidos.</p>
