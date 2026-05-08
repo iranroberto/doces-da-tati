@@ -9,6 +9,9 @@ interface StoreHeaderProps {
 
 const StoreHeader = ({ onCartOpen }: StoreHeaderProps) => {
   const { config, cartCount } = useStore();
+  const match = config.name.match(/^(.*?)(vizio)$/i);
+  const prefixName = match?.[1]?.trim();
+  const scriptName = match?.[2] || config.name;
 
   return (
     <header className="sticky top-0 z-40 border-b border-primary-foreground/15 bg-primary text-primary-foreground shadow-lg">
@@ -21,8 +24,17 @@ const StoreHeader = ({ onCartOpen }: StoreHeaderProps) => {
               <CakeSlice className="h-10 w-10 md:h-14 md:w-14" />
             </span>
           )}
-          <div className="min-w-0">
-            <h1 className="truncate font-logo text-4xl font-normal leading-none tracking-normal drop-shadow-sm sm:text-5xl md:text-7xl">{config.name}</h1>
+          <div className="min-w-0 overflow-visible py-2">
+            <h1 className="flex min-w-0 flex-col overflow-visible drop-shadow-sm">
+              {prefixName && (
+                <span className="font-logoSerif text-xl font-semibold uppercase leading-none tracking-[0.22em] sm:text-2xl md:text-4xl">
+                  {prefixName}
+                </span>
+              )}
+              <span className="overflow-visible font-logo text-5xl font-normal leading-[1.05] tracking-normal sm:text-6xl md:text-8xl">
+                {scriptName}
+              </span>
+            </h1>
           </div>
         </Link>
 
