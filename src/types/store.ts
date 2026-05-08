@@ -23,6 +23,7 @@ export interface StoreConfig {
   showBanner: boolean;
   bannerPositionX: number;
   bannerPositionY: number;
+  bannerHeight: number;
   showHeaderName: boolean;
   whatsapp: string;
   pixKey: string;

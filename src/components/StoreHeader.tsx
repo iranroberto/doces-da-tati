@@ -20,9 +20,10 @@ const StoreHeader = ({ onCartOpen }: StoreHeaderProps) => {
       style={hasBanner ? {
         backgroundImage: `linear-gradient(90deg, hsl(var(--primary) / 0.82), hsl(var(--primary) / 0.54)), url(${config.bannerImage})`,
         backgroundPosition: `${config.bannerPositionX}% ${config.bannerPositionY}%`,
+        minHeight: `${config.bannerHeight}px`,
       } : undefined}
     >
-      <div className="container mx-auto flex items-center justify-between px-4 py-5">
+      <div className={hasBanner ? "container mx-auto flex min-h-[inherit] items-center justify-between px-4 py-6" : "container mx-auto flex items-center justify-between px-4 py-5"}>
         <Link to="/" className="flex min-w-0 items-center gap-4 md:gap-5">
           {config.logo ? (
             <img src={config.logo} alt={config.name} className="h-24 w-24 rounded-full border-4 border-primary-foreground bg-primary-foreground object-cover shadow-xl md:h-32 md:w-32" />

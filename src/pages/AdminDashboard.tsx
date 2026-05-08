@@ -46,6 +46,7 @@ const AdminDashboard = () => {
   const [showBanner, setShowBanner] = useState(config.showBanner);
   const [bannerPositionX, setBannerPositionX] = useState(String(config.bannerPositionX));
   const [bannerPositionY, setBannerPositionY] = useState(String(config.bannerPositionY));
+  const [bannerHeight, setBannerHeight] = useState(String(config.bannerHeight));
   const [showHeaderName, setShowHeaderName] = useState(config.showHeaderName);
   const [filterAllLabel, setFilterAllLabel] = useState(config.filterAllLabel);
   const [filterPromoLabel, setFilterPromoLabel] = useState(config.filterPromoLabel);
@@ -84,6 +85,7 @@ const AdminDashboard = () => {
     setShowBanner(config.showBanner);
     setBannerPositionX(String(config.bannerPositionX));
     setBannerPositionY(String(config.bannerPositionY));
+    setBannerHeight(String(config.bannerHeight));
     setShowHeaderName(config.showHeaderName);
     setFilterAllLabel(config.filterAllLabel);
     setFilterPromoLabel(config.filterPromoLabel);
@@ -114,6 +116,7 @@ const AdminDashboard = () => {
         showBanner,
         bannerPositionX: Number(bannerPositionX),
         bannerPositionY: Number(bannerPositionY),
+        bannerHeight: Number(bannerHeight),
         showHeaderName,
         filterAllLabel: filterAllLabel.trim() || "Todos",
         filterPromoLabel: filterPromoLabel.trim() || "Ofertas",
@@ -506,9 +509,15 @@ const AdminDashboard = () => {
                       <img
                         src={bannerImage}
                         alt="Preview do banner"
-                        className="h-40 w-full object-cover"
-                        style={{ objectPosition: `${bannerPositionX}% ${bannerPositionY}%` }}
+                        className="w-full object-cover"
+                        style={{ height: `${bannerHeight}px`, objectPosition: `${bannerPositionX}% ${bannerPositionY}%` }}
                       />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs font-semibold text-muted-foreground">
+                      <span>Horizontal: {bannerPositionX}%</span>
+                      <span>Vertical: {bannerPositionY}%</span>
+                      <span>Altura: {bannerHeight}px</span>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -540,6 +549,17 @@ const AdminDashboard = () => {
                         max="100"
                         value={bannerPositionY}
                         onChange={e => { setStoreFormDirty(true); setBannerPositionY(e.target.value); }}
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Altura do banner</Label>
+                      <Input
+                        type="range"
+                        min="140"
+                        max="420"
+                        value={bannerHeight}
+                        onChange={e => { setStoreFormDirty(true); setBannerHeight(e.target.value); }}
                       />
                     </div>
 
