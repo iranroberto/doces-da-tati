@@ -33,18 +33,18 @@ const ProductCard = ({ product }: { product: Product }) => {
         {isSoldOut && <div className="absolute inset-0 flex items-center justify-center bg-background/75 text-sm font-bold text-destructive">Esgotado</div>}
       </div>
 
-      <div className="space-y-3 p-4">
+      <div className="space-y-2 p-3 sm:space-y-3 sm:p-4">
         <div>
           {category && (
             <p className="mb-1 text-xs font-bold uppercase tracking-wide text-primary">{category.name}</p>
           )}
-          <h3 className="line-clamp-2 min-h-14 text-lg font-bold leading-tight text-card-foreground">{product.name}</h3>
-          <p className="mt-1 line-clamp-2 min-h-10 text-sm text-muted-foreground">{product.description}</p>
+          <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-tight text-card-foreground sm:min-h-14 sm:text-lg">{product.name}</h3>
+          <p className="mt-1 line-clamp-2 min-h-9 text-xs text-muted-foreground sm:min-h-10 sm:text-sm">{product.description}</p>
         </div>
 
-        <div className="flex items-end justify-between gap-3 border-t border-border pt-3">
-          <span className="text-2xl font-extrabold text-primary">{formatPrice(product.price)}</span>
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
+        <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+          <span className="text-base font-extrabold text-primary sm:text-2xl">{formatPrice(product.price)}</span>
+          <span className="flex w-fit shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
             <Package className="h-3 w-3" /> {product.stock > 0 ? `${product.stock} un.` : "sem estoque"}
           </span>
         </div>

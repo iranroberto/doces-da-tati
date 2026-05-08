@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BadgePercent, Clock, MessageCircle, PackageCheck, Search, ShieldCheck } from "lucide-react";
+import { MessageCircle, PackageCheck, Search } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
 import CartDrawer from "@/components/CartDrawer";
 import ProductCard from "@/components/ProductCard";
@@ -51,45 +51,9 @@ const Index = () => {
         </div>
       )}
 
-      <section className="border-b border-border bg-card">
-        <div className="container mx-auto grid gap-3 px-4 py-4 md:grid-cols-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Clock className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-sm font-bold">Pedido rapido</p>
-              <p className="text-xs text-muted-foreground">Monte o carrinho e finalize em poucos cliques.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary/30 text-secondary-foreground">
-              <BadgePercent className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-sm font-bold">{promoCount} ofertas ativas</p>
-              <p className="text-xs text-muted-foreground">Produtos em destaque aparecem para voce.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-sm font-bold">Pix e WhatsApp</p>
-              <p className="text-xs text-muted-foreground">Pagamento facilitado e atendimento direto.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-primary">Cardapio</p>
-            <h2 className="font-display text-3xl text-foreground">Nossos Produtos</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{availableCount} produtos disponiveis para pedido</p>
-          </div>
+      <main className="container mx-auto px-4 py-6 md:py-8">
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm font-semibold text-muted-foreground">{availableCount} produtos disponiveis para pedido</p>
           <div className="relative w-full md:max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -142,7 +106,7 @@ const Index = () => {
             <p className="text-lg">Nenhum produto encontrado para sua busca.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {filteredProducts.map(product => (
               <ProductCard key={product.id} product={product} />
             ))}

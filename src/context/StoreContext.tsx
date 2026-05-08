@@ -4,11 +4,11 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const productImage = (fileName: string) => fileName ? `/produtos/${fileName}` : "";
 const STORE_CONFIG_ID = "main";
-const DEFAULT_LOGO = "/logo-doces-da-tati-round.png?v=20260506-1";
+const DEFAULT_LOGO = "/logo-doces-da-tati-round.png?v=20260507-2";
 
 const normalizeLogo = (logo: unknown) => {
   const value = String(logo ?? "");
-  return value === "/logo-doces-da-tati-round.png" ? DEFAULT_LOGO : value;
+  return value.startsWith("/logo-doces-da-tati-round.png") ? DEFAULT_LOGO : value;
 };
 
 const DEFAULT_PRODUCTS: Product[] = [
