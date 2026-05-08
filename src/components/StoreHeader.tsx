@@ -22,7 +22,7 @@ const StoreHeader = ({ onCartOpen }: StoreHeaderProps) => {
             </span>
           )}
           <div className="min-w-0">
-            <h1 className="truncate font-display text-2xl tracking-wide drop-shadow-sm sm:text-3xl md:text-5xl">{config.name}</h1>
+            <h1 className="truncate font-logo text-4xl font-normal leading-none tracking-normal drop-shadow-sm sm:text-5xl md:text-7xl">{config.name}</h1>
           </div>
         </Link>
 

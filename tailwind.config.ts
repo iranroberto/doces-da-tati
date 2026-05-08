@@ -9,6 +9,7 @@ export default {
     extend: {
       fontFamily: {
         display: ["Fredoka One", "cursive"],
+        logo: ["Great Vibes", "cursive"],
         body: ["Poppins", "sans-serif"],
       },
       colors: {

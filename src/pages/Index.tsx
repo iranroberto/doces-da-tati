@@ -63,21 +63,21 @@ const Index = () => {
           </div>
         </div>
 
-        <div className="mb-3 flex flex-wrap gap-2">
-          <Button variant={filter === "all" ? "default" : "outline"} size="sm" onClick={() => setFilter("all")}>
+        <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-2">
+          <Button variant={filter === "all" ? "default" : "outline"} size="sm" className="shrink-0" onClick={() => setFilter("all")}>
             Todos
           </Button>
-          <Button variant={filter === "promo" ? "default" : "outline"} size="sm" onClick={() => setFilter("promo")}>
+          <Button variant={filter === "promo" ? "default" : "outline"} size="sm" className="shrink-0" onClick={() => setFilter("promo")}>
             Ofertas
           </Button>
-          <Button variant={filter === "available" ? "default" : "outline"} size="sm" onClick={() => setFilter("available")}>
+          <Button variant={filter === "available" ? "default" : "outline"} size="sm" className="shrink-0" onClick={() => setFilter("available")}>
             Disponiveis
           </Button>
         </div>
 
         {visibleCategories.length > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2">
-            <Button variant={categoryFilter === "all" ? "secondary" : "outline"} size="sm" onClick={() => setCategoryFilter("all")}>
+          <div className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-2">
+            <Button variant={categoryFilter === "all" ? "secondary" : "outline"} size="sm" className="shrink-0" onClick={() => setCategoryFilter("all")}>
               Todas categorias
             </Button>
             {visibleCategories.map(category => (
@@ -85,6 +85,7 @@ const Index = () => {
                 key={category.id}
                 variant={categoryFilter === category.id ? "secondary" : "outline"}
                 size="sm"
+                className="shrink-0"
                 onClick={() => setCategoryFilter(category.id)}
               >
                 {category.name}
