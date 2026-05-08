@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { MessageCircle, PackageCheck, Search } from "lucide-react";
+import { PackageCheck, Search } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
 import CartDrawer from "@/components/CartDrawer";
 import ProductCard from "@/components/ProductCard";
@@ -36,8 +36,6 @@ const Index = () => {
 
   const promoCount = products.filter(product => product.isPromo).length;
   const availableCount = products.filter(product => product.stock > 0).length;
-  const whatsappUrl = config.whatsapp ? `https://wa.me/${config.whatsapp.replace(/\D/g, "")}` : "";
-
   return (
     <div className="min-h-screen bg-background">
       <StoreHeader onCartOpen={() => setCartOpen(true)} />
@@ -121,17 +119,6 @@ const Index = () => {
         </Link>
       </footer>
 
-      {whatsappUrl && (
-        <a
-          href={whatsappUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fixed bottom-5 right-5 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-green-600 text-white shadow-xl transition hover:scale-105 hover:bg-green-700"
-          aria-label="Falar pelo WhatsApp"
-        >
-          <MessageCircle className="h-7 w-7" />
-        </a>
-      )}
     </div>
   );
 };

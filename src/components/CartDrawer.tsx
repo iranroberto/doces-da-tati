@@ -1,7 +1,11 @@
-import { MessageCircle, Minus, Package, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { MessageCircle, Minus, Package, Plus, Trash2, UserRound } from "lucide-react";
+import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import type { CustomerInfo } from "@/types/store";
 
 interface CartDrawerProps {
   open: boolean;
@@ -11,12 +15,42 @@ interface CartDrawerProps {
 const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
+const loadCustomerInfo = (): CustomerInfo => {
+  try {
+    const raw = localStorage.getItem("customer_info");
+    const value = raw ? JSON.parse(raw) : {};
+    return {
+      name: String(value.name ?? ""),
+      whatsapp: String(value.whatsapp ?? ""),
+    };
+  } catch {
+    return { name: "", whatsapp: "" };
+  }
+};
+
 const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
   const { cart, updateCartQty, removeFromCart, clearCart, cartTotal, config } = useStore();
+  const [customer, setCustomer] = useState<CustomerInfo>(() => loadCustomerInfo());
+
+  useEffect(() => {
+    localStorage.setItem("customer_info", JSON.stringify(customer));
+  }, [customer]);
 
   const finishOrder = () => {
+    const customerName = String(customer.name ?? "").trim();
+    const customerWhatsapp = String(customer.whatsapp ?? "").replace(/\D/g, "");
+
+    if (!customerName || customerWhatsapp.length < 10) {
+      toast.error("Informe seu nome e WhatsApp para finalizar.");
+      return;
+    }
+
     const order = {
       createdAt: new Date().toISOString(),
+      customer: {
+        name: customerName,
+        whatsapp: customerWhatsapp,
+      },
       items: cart.map(item => ({
         productId: item.product.id,
         name: item.product.name,
@@ -28,7 +62,7 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
     };
 
     localStorage.setItem("pending_checkout", JSON.stringify(order));
-    window.open("/checkout", "_blank", "noopener,noreferrer");
+    window.open(`${window.location.origin}${window.location.pathname}#/checkout`, "_blank", "noopener,noreferrer");
     onClose();
   };
 
@@ -80,6 +114,27 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
 
         {cart.length > 0 && (
           <SheetFooter className="flex-col gap-3 border-t border-border pt-4">
+            <div className="w-full rounded-lg border border-border bg-muted/40 p-3 text-left">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <UserRound className="h-4 w-4" />
+                </span>
+                <p className="font-bold">Login do cliente</p>
+              </div>
+              <div className="space-y-2">
+                <Input
+                  value={customer.name}
+                  onChange={event => setCustomer(current => ({ ...current, name: event.target.value }))}
+                  placeholder="Seu nome"
+                />
+                <Input
+                  value={customer.whatsapp}
+                  onChange={event => setCustomer(current => ({ ...current, whatsapp: event.target.value }))}
+                  inputMode="tel"
+                  placeholder="WhatsApp com DDD"
+                />
+              </div>
+            </div>
             <div className="flex w-full items-center justify-between text-lg font-bold">
               <span>Total:</span>
               <span className="text-primary">{formatPrice(cartTotal)}</span>

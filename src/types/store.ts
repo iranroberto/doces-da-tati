@@ -30,3 +30,8 @@ export interface CartItem {
   product: Product;
   quantity: number;
 }
+
+export interface CustomerInfo {
+  name: string;
+  whatsapp: string;
+}

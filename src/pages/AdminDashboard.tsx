@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, Image, LogOut, Package, Pencil, Plus, Save, Store, Tags, Trash2 } from "lucide-react";
+import { BarChart3, CheckCircle2, ClipboardList, DollarSign, Image, LogOut, Package, Pencil, Plus, Save, Store, Tags, Trash2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Product } from "@/types/store";
@@ -34,7 +34,7 @@ const slugify = (value: string) =>
 const AdminDashboard = () => {
   const { config, setConfig, categories, setCategories, deleteCategory, products, setProducts, deleteProduct, logout, isAdmin, isLoading } = useStore();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"store" | "categories" | "products">("store");
+  const [tab, setTab] = useState<"dashboard" | "store" | "categories" | "products" | "orders" | "clients">("dashboard");
 
   const [storeName, setStoreName] = useState(config.name);
   const [whatsapp, setWhatsapp] = useState(config.whatsapp);
@@ -246,40 +246,95 @@ const AdminDashboard = () => {
     navigate("/");
   };
 
+  const dashboardCards = [
+    { label: "Pedidos hoje", value: "0", icon: ClipboardList },
+    { label: "Faturamento", value: formatPrice(0), icon: DollarSign },
+    { label: "Clientes", value: "0", icon: Users },
+  ];
+
+  const navItems = [
+    { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
+    { id: "products" as const, label: "Produtos", icon: Package },
+    { id: "orders" as const, label: "Pedidos", icon: ClipboardList },
+    { id: "clients" as const, label: "Clientes", icon: Users },
+    { id: "store" as const, label: "Loja", icon: Store },
+    { id: "categories" as const, label: "Categorias", icon: Tags },
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-primary text-primary-foreground shadow-lg">
-        <div className="container mx-auto flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20" onClick={() => navigate("/")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="font-display text-lg md:text-xl">Painel Admin</h1>
-          </div>
-          <Button variant="ghost" size="sm" className="gap-1 text-primary-foreground hover:bg-primary-foreground/20" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" /> Sair
+    <div className="min-h-screen bg-[#220b00] text-[#f0d8c0]">
+      <header className="bg-[#f0d8c0] text-[#481800] shadow-[0_14px_40px_rgba(72,24,0,0.18)]">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-5 md:flex-row md:items-start md:justify-between">
+          <button className="w-fit font-display text-2xl font-bold" onClick={() => navigate("/")}>
+            Doces <span className="text-[#a76b18]">Admin</span>
+          </button>
+
+          <nav className="grid w-full gap-2 sm:grid-cols-2 md:max-w-xl md:grid-cols-3">
+            {navItems.map(item => {
+              const Icon = item.icon;
+              const isActive = tab === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  className={isActive
+                    ? "flex items-center gap-3 bg-[#d8c0a8]/75 px-5 py-3 text-sm font-bold text-[#481800]"
+                    : "flex items-center gap-3 px-5 py-3 text-sm font-semibold text-[#603000] transition hover:bg-[#d8c0a8]/45"}
+                  onClick={() => setTab(item.id)}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          <Button variant="ghost" size="sm" className="gap-2 text-lg font-bold text-[#603000] hover:bg-[#d8c0a8]/60 hover:text-[#481800]" onClick={handleLogout}>
+            <LogOut className="h-5 w-5" /> Sair
           </Button>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="mx-auto max-w-6xl px-4 py-8 md:py-12">
         {isLoading && (
-          <div className="mb-4 rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+          <div className="mb-4 border border-[#603000] bg-[#481800] px-3 py-2 text-sm font-semibold text-[#f0d8c0]">
             Carregando dados online...
           </div>
         )}
 
-        <div className="mb-6 flex flex-wrap gap-2">
-          <Button variant={tab === "store" ? "default" : "outline"} className="gap-2" onClick={() => setTab("store")}>
-            <Store className="h-4 w-4" /> Loja
-          </Button>
-          <Button variant={tab === "categories" ? "default" : "outline"} className="gap-2" onClick={() => setTab("categories")}>
-            <Tags className="h-4 w-4" /> Categorias ({categories.length})
-          </Button>
-          <Button variant={tab === "products" ? "default" : "outline"} className="gap-2" onClick={() => setTab("products")}>
-            <Package className="h-4 w-4" /> Produtos ({products.length})
-          </Button>
-        </div>
+        {tab === "dashboard" && (
+          <div className="space-y-10">
+            <h1 className="font-display text-4xl text-[#f0d8c0]">Dashboard</h1>
+
+            <div className="grid gap-6 md:grid-cols-3">
+              {dashboardCards.map(card => {
+                const Icon = card.icon;
+
+                return (
+                  <div key={card.label} className="rounded-[18px] border border-[#603000] bg-[#481800] p-6 shadow-[0_18px_50px_rgba(0,0,0,0.24)]">
+                    <div className="flex items-start justify-between">
+                      <p className="text-sm font-semibold uppercase text-[#d8c0a8]">{card.label}</p>
+                      <Icon className="h-9 w-9 text-[#d8c090]" />
+                    </div>
+                    <p className="mt-6 font-display text-4xl text-[#f0d8a8]">{card.value}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
+              <div className="grid grid-cols-4 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
+                <span>Pedido</span>
+                <span>Cliente</span>
+                <span>Total</span>
+                <span>Status</span>
+              </div>
+              <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
+                Nenhum pedido ainda
+              </div>
+            </div>
+          </div>
+        )}
 
         {tab === "store" && (
           <div className="grid max-w-5xl gap-6 lg:grid-cols-2">
@@ -420,6 +475,39 @@ const AdminDashboard = () => {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "orders" && (
+          <div className="space-y-6">
+            <h1 className="font-display text-4xl text-[#f0d8c0]">Pedidos</h1>
+            <div className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
+              <div className="grid grid-cols-4 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
+                <span>Pedido</span>
+                <span>Cliente</span>
+                <span>Total</span>
+                <span>Status</span>
+              </div>
+              <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
+                Nenhum pedido ainda
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "clients" && (
+          <div className="space-y-6">
+            <h1 className="font-display text-4xl text-[#f0d8c0]">Clientes</h1>
+            <div className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
+              <div className="grid grid-cols-3 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
+                <span>Nome</span>
+                <span>WhatsApp</span>
+                <span>Pedidos</span>
+              </div>
+              <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
+                Nenhum cliente ainda
+              </div>
             </div>
           </div>
         )}

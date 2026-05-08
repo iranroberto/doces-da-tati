@@ -12,18 +12,17 @@ const StoreHeader = ({ onCartOpen }: StoreHeaderProps) => {
 
   return (
     <header className="sticky top-0 z-40 border-b border-primary-foreground/15 bg-primary text-primary-foreground shadow-lg">
-      <div className="container mx-auto flex items-center justify-between px-4 py-4">
-        <Link to="/" className="flex min-w-0 items-center gap-4">
+      <div className="container mx-auto flex items-center justify-between px-4 py-5">
+        <Link to="/" className="flex min-w-0 items-center gap-4 md:gap-5">
           {config.logo ? (
-            <img src={config.logo} alt={config.name} className="h-16 w-16 rounded-full border-4 border-primary-foreground bg-primary-foreground object-cover shadow-lg md:h-20 md:w-20" />
+            <img src={config.logo} alt={config.name} className="h-24 w-24 rounded-full border-4 border-primary-foreground bg-primary-foreground object-cover shadow-xl md:h-32 md:w-32" />
           ) : (
-            <span className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-primary-foreground bg-primary-foreground text-primary shadow-lg md:h-20 md:w-20">
-              <CakeSlice className="h-8 w-8 md:h-10 md:w-10" />
+            <span className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-primary-foreground bg-primary-foreground text-primary shadow-xl md:h-32 md:w-32">
+              <CakeSlice className="h-10 w-10 md:h-14 md:w-14" />
             </span>
           )}
           <div className="min-w-0">
-            <h1 className="truncate font-display text-3xl tracking-wide drop-shadow-sm md:text-5xl">{config.name}</h1>
-            <p className="hidden text-sm font-semibold opacity-95 sm:block md:text-base">doces, bolos e salgados por encomenda</p>
+            <h1 className="truncate font-display text-2xl tracking-wide drop-shadow-sm sm:text-3xl md:text-5xl">{config.name}</h1>
           </div>
         </Link>
 
