@@ -19,6 +19,10 @@ export interface StoreConfig {
   name: string;
   logo: string;
   banner: string;
+  bannerImage: string;
+  showBanner: boolean;
+  bannerPositionX: number;
+  bannerPositionY: number;
   whatsapp: string;
   pixKey: string;
   pixReceiverName: string;

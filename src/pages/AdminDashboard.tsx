@@ -42,6 +42,10 @@ const AdminDashboard = () => {
   const [pixReceiverName, setPixReceiverName] = useState(config.pixReceiverName);
   const [pixCity, setPixCity] = useState(config.pixCity);
   const [adminPw, setAdminPw] = useState(config.adminPassword);
+  const [bannerImage, setBannerImage] = useState(config.bannerImage);
+  const [showBanner, setShowBanner] = useState(config.showBanner);
+  const [bannerPositionX, setBannerPositionX] = useState(String(config.bannerPositionX));
+  const [bannerPositionY, setBannerPositionY] = useState(String(config.bannerPositionY));
   const [filterAllLabel, setFilterAllLabel] = useState(config.filterAllLabel);
   const [filterPromoLabel, setFilterPromoLabel] = useState(config.filterPromoLabel);
   const [filterAvailableLabel, setFilterAvailableLabel] = useState(config.filterAvailableLabel);
@@ -75,6 +79,10 @@ const AdminDashboard = () => {
     setPixReceiverName(config.pixReceiverName);
     setPixCity(config.pixCity);
     setAdminPw(config.adminPassword);
+    setBannerImage(config.bannerImage);
+    setShowBanner(config.showBanner);
+    setBannerPositionX(String(config.bannerPositionX));
+    setBannerPositionY(String(config.bannerPositionY));
     setFilterAllLabel(config.filterAllLabel);
     setFilterPromoLabel(config.filterPromoLabel);
     setFilterAvailableLabel(config.filterAvailableLabel);
@@ -100,6 +108,10 @@ const AdminDashboard = () => {
         pixReceiverName: pixReceiverName.trim() || "DOCES DA TATI",
         pixCity: pixCity.trim() || "RIO DE JANEIRO",
         adminPassword: adminPw || "bryan15",
+        bannerImage,
+        showBanner,
+        bannerPositionX: Number(bannerPositionX),
+        bannerPositionY: Number(bannerPositionY),
         filterAllLabel: filterAllLabel.trim() || "Todos",
         filterPromoLabel: filterPromoLabel.trim() || "Ofertas",
         filterAvailableLabel: filterAvailableLabel.trim() || "Disponiveis",
@@ -139,6 +151,21 @@ const AdminDashboard = () => {
     } catch {
       toast.error("Nao foi possivel remover a logo no banco online");
     }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBannerImage(await fileToBase64(file));
+    setShowBanner(true);
+    setStoreFormDirty(true);
+  };
+
+  const removeBanner = () => {
+    setBannerImage("");
+    setShowBanner(false);
+    setStoreFormDirty(true);
   };
 
   const openNewProduct = () => {
@@ -459,6 +486,60 @@ const AdminDashboard = () => {
                     </Button>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-lg">
+              <CardHeader><CardTitle>Banner da vitrine</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Imagem do banner</Label>
+                  <Input type="file" accept="image/*" onChange={handleBannerUpload} />
+                </div>
+
+                {bannerImage && (
+                  <>
+                    <div className="overflow-hidden rounded-lg border bg-muted">
+                      <img
+                        src={bannerImage}
+                        alt="Preview do banner"
+                        className="h-40 w-full object-cover"
+                        style={{ objectPosition: `${bannerPositionX}% ${bannerPositionY}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Switch checked={showBanner} onCheckedChange={checked => { setStoreFormDirty(true); setShowBanner(checked); }} />
+                      <Label>Banner visivel na vitrine</Label>
+                    </div>
+
+                    <div>
+                      <Label>Ajuste horizontal</Label>
+                      <Input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={bannerPositionX}
+                        onChange={e => { setStoreFormDirty(true); setBannerPositionX(e.target.value); }}
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Ajuste vertical</Label>
+                      <Input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={bannerPositionY}
+                        onChange={e => { setStoreFormDirty(true); setBannerPositionY(e.target.value); }}
+                      />
+                    </div>
+
+                    <Button variant="outline" className="gap-2 text-destructive" onClick={removeBanner}>
+                      <Trash2 className="h-4 w-4" /> Remover banner
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>

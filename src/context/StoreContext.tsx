@@ -101,6 +101,10 @@ const DEFAULT_CONFIG: StoreConfig = {
   name: "doces da tati",
   logo: DEFAULT_LOGO,
   banner: "",
+  bannerImage: "",
+  showBanner: false,
+  bannerPositionX: 50,
+  bannerPositionY: 50,
   whatsapp: "5521968682297",
   pixKey: "",
   pixReceiverName: "DOCES DA TATI",
@@ -139,9 +143,15 @@ const configForLocalStorage = (config: StoreConfig): StoreConfig => ({
 });
 
 const parseBannerConfig = (banner: unknown): Partial<StoreConfig> => {
+  const raw = String(banner || "");
+
   try {
-    const value = JSON.parse(String(banner || "{}"));
+    const value = JSON.parse(raw || "{}");
     return {
+      bannerImage: value.bannerImage,
+      showBanner: value.showBanner,
+      bannerPositionX: value.bannerPositionX,
+      bannerPositionY: value.bannerPositionY,
       filterAllLabel: value.filterAllLabel,
       filterPromoLabel: value.filterPromoLabel,
       filterAvailableLabel: value.filterAvailableLabel,
@@ -152,11 +162,15 @@ const parseBannerConfig = (banner: unknown): Partial<StoreConfig> => {
       showCategoryFilter: value.showCategoryFilter,
     };
   } catch {
-    return {};
+    return raw.startsWith("data:") || raw.startsWith("/") || raw.startsWith("http") ? { bannerImage: raw, showBanner: true } : {};
   }
 };
 
 const serializeBannerConfig = (config: StoreConfig) => JSON.stringify({
+  bannerImage: config.bannerImage,
+  showBanner: config.showBanner,
+  bannerPositionX: config.bannerPositionX,
+  bannerPositionY: config.bannerPositionY,
   filterAllLabel: config.filterAllLabel,
   filterPromoLabel: config.filterPromoLabel,
   filterAvailableLabel: config.filterAvailableLabel,
@@ -168,11 +182,20 @@ const serializeBannerConfig = (config: StoreConfig) => JSON.stringify({
 });
 
 const optionalBoolean = (value: unknown) => typeof value === "boolean" ? value : undefined;
+const percentValue = (value: unknown, fallback: number) => {
+  const numberValue = Number(value);
+  if (Number.isNaN(numberValue)) return fallback;
+  return Math.min(100, Math.max(0, numberValue));
+};
 
 const normalizeConfig = (config: Partial<StoreConfig>): StoreConfig => ({
   ...DEFAULT_CONFIG,
   ...config,
   logo: normalizeLogo(config.logo ?? DEFAULT_CONFIG.logo),
+  bannerImage: String(config.bannerImage ?? DEFAULT_CONFIG.bannerImage),
+  showBanner: Boolean(config.showBanner ?? DEFAULT_CONFIG.showBanner),
+  bannerPositionX: percentValue(config.bannerPositionX, DEFAULT_CONFIG.bannerPositionX),
+  bannerPositionY: percentValue(config.bannerPositionY, DEFAULT_CONFIG.bannerPositionY),
   filterAllLabel: String(config.filterAllLabel ?? DEFAULT_CONFIG.filterAllLabel),
   filterPromoLabel: String(config.filterPromoLabel ?? DEFAULT_CONFIG.filterPromoLabel),
   filterAvailableLabel: String(config.filterAvailableLabel ?? DEFAULT_CONFIG.filterAvailableLabel),
@@ -233,6 +256,10 @@ const configFromRow = (row: Record<string, unknown>): StoreConfig => {
     pixReceiverName: String(row.pix_receiver_name ?? DEFAULT_CONFIG.pixReceiverName),
     pixCity: String(row.pix_city ?? DEFAULT_CONFIG.pixCity),
     adminPassword: String(row.admin_password ?? DEFAULT_CONFIG.adminPassword),
+    bannerImage: bannerConfig.bannerImage,
+    showBanner: bannerConfig.showBanner,
+    bannerPositionX: bannerConfig.bannerPositionX,
+    bannerPositionY: bannerConfig.bannerPositionY,
     filterAllLabel: row.filter_all_label ? String(row.filter_all_label) : bannerConfig.filterAllLabel,
     filterPromoLabel: row.filter_promo_label ? String(row.filter_promo_label) : bannerConfig.filterPromoLabel,
     filterAvailableLabel: row.filter_available_label ? String(row.filter_available_label) : bannerConfig.filterAvailableLabel,
