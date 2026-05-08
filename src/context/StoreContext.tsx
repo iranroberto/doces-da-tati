@@ -138,6 +138,37 @@ const configForLocalStorage = (config: StoreConfig): StoreConfig => ({
   logo: config.logo.startsWith("data:") ? "" : config.logo,
 });
 
+const parseBannerConfig = (banner: unknown): Partial<StoreConfig> => {
+  try {
+    const value = JSON.parse(String(banner || "{}"));
+    return {
+      filterAllLabel: value.filterAllLabel,
+      filterPromoLabel: value.filterPromoLabel,
+      filterAvailableLabel: value.filterAvailableLabel,
+      categoryAllLabel: value.categoryAllLabel,
+      showFilterAll: value.showFilterAll,
+      showFilterPromo: value.showFilterPromo,
+      showFilterAvailable: value.showFilterAvailable,
+      showCategoryFilter: value.showCategoryFilter,
+    };
+  } catch {
+    return {};
+  }
+};
+
+const serializeBannerConfig = (config: StoreConfig) => JSON.stringify({
+  filterAllLabel: config.filterAllLabel,
+  filterPromoLabel: config.filterPromoLabel,
+  filterAvailableLabel: config.filterAvailableLabel,
+  categoryAllLabel: config.categoryAllLabel,
+  showFilterAll: config.showFilterAll,
+  showFilterPromo: config.showFilterPromo,
+  showFilterAvailable: config.showFilterAvailable,
+  showCategoryFilter: config.showCategoryFilter,
+});
+
+const optionalBoolean = (value: unknown) => typeof value === "boolean" ? value : undefined;
+
 const normalizeConfig = (config: Partial<StoreConfig>): StoreConfig => ({
   ...DEFAULT_CONFIG,
   ...config,
@@ -190,43 +221,39 @@ const categoryToRow = (category: Category, sortOrder: number) => ({
   updated_at: new Date().toISOString(),
 });
 
-const configFromRow = (row: Record<string, unknown>): StoreConfig => normalizeConfig({
-  name: String(row.name ?? DEFAULT_CONFIG.name),
-  logo: String(row.logo ?? DEFAULT_CONFIG.logo),
-  banner: String(row.banner ?? DEFAULT_CONFIG.banner),
-  whatsapp: String(row.whatsapp ?? DEFAULT_CONFIG.whatsapp),
-  pixKey: String(row.pix_key ?? DEFAULT_CONFIG.pixKey),
-  pixReceiverName: String(row.pix_receiver_name ?? DEFAULT_CONFIG.pixReceiverName),
-  pixCity: String(row.pix_city ?? DEFAULT_CONFIG.pixCity),
-  adminPassword: String(row.admin_password ?? DEFAULT_CONFIG.adminPassword),
-  filterAllLabel: String(row.filter_all_label ?? DEFAULT_CONFIG.filterAllLabel),
-  filterPromoLabel: String(row.filter_promo_label ?? DEFAULT_CONFIG.filterPromoLabel),
-  filterAvailableLabel: String(row.filter_available_label ?? DEFAULT_CONFIG.filterAvailableLabel),
-  categoryAllLabel: String(row.category_all_label ?? DEFAULT_CONFIG.categoryAllLabel),
-  showFilterAll: Boolean(row.show_filter_all ?? DEFAULT_CONFIG.showFilterAll),
-  showFilterPromo: Boolean(row.show_filter_promo ?? DEFAULT_CONFIG.showFilterPromo),
-  showFilterAvailable: Boolean(row.show_filter_available ?? DEFAULT_CONFIG.showFilterAvailable),
-  showCategoryFilter: Boolean(row.show_category_filter ?? DEFAULT_CONFIG.showCategoryFilter),
-});
+const configFromRow = (row: Record<string, unknown>): StoreConfig => {
+  const bannerConfig = parseBannerConfig(row.banner);
+
+  return normalizeConfig({
+    name: String(row.name ?? DEFAULT_CONFIG.name),
+    logo: String(row.logo ?? DEFAULT_CONFIG.logo),
+    banner: String(row.banner ?? DEFAULT_CONFIG.banner),
+    whatsapp: String(row.whatsapp ?? DEFAULT_CONFIG.whatsapp),
+    pixKey: String(row.pix_key ?? DEFAULT_CONFIG.pixKey),
+    pixReceiverName: String(row.pix_receiver_name ?? DEFAULT_CONFIG.pixReceiverName),
+    pixCity: String(row.pix_city ?? DEFAULT_CONFIG.pixCity),
+    adminPassword: String(row.admin_password ?? DEFAULT_CONFIG.adminPassword),
+    filterAllLabel: row.filter_all_label ? String(row.filter_all_label) : bannerConfig.filterAllLabel,
+    filterPromoLabel: row.filter_promo_label ? String(row.filter_promo_label) : bannerConfig.filterPromoLabel,
+    filterAvailableLabel: row.filter_available_label ? String(row.filter_available_label) : bannerConfig.filterAvailableLabel,
+    categoryAllLabel: row.category_all_label ? String(row.category_all_label) : bannerConfig.categoryAllLabel,
+    showFilterAll: optionalBoolean(row.show_filter_all) ?? bannerConfig.showFilterAll,
+    showFilterPromo: optionalBoolean(row.show_filter_promo) ?? bannerConfig.showFilterPromo,
+    showFilterAvailable: optionalBoolean(row.show_filter_available) ?? bannerConfig.showFilterAvailable,
+    showCategoryFilter: optionalBoolean(row.show_category_filter) ?? bannerConfig.showCategoryFilter,
+  });
+};
 
 const configToRow = (config: StoreConfig) => ({
   id: STORE_CONFIG_ID,
   name: config.name,
   logo: config.logo,
-  banner: config.banner,
+  banner: serializeBannerConfig(config),
   whatsapp: config.whatsapp,
   pix_key: config.pixKey,
   pix_receiver_name: config.pixReceiverName,
   pix_city: config.pixCity,
   admin_password: config.adminPassword,
-  filter_all_label: config.filterAllLabel,
-  filter_promo_label: config.filterPromoLabel,
-  filter_available_label: config.filterAvailableLabel,
-  category_all_label: config.categoryAllLabel,
-  show_filter_all: config.showFilterAll,
-  show_filter_promo: config.showFilterPromo,
-  show_filter_available: config.showFilterAvailable,
-  show_category_filter: config.showCategoryFilter,
   updated_at: new Date().toISOString(),
 });
 
