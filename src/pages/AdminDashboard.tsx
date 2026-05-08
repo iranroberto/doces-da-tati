@@ -46,6 +46,7 @@ const AdminDashboard = () => {
   const [showBanner, setShowBanner] = useState(config.showBanner);
   const [bannerPositionX, setBannerPositionX] = useState(String(config.bannerPositionX));
   const [bannerPositionY, setBannerPositionY] = useState(String(config.bannerPositionY));
+  const [showHeaderName, setShowHeaderName] = useState(config.showHeaderName);
   const [filterAllLabel, setFilterAllLabel] = useState(config.filterAllLabel);
   const [filterPromoLabel, setFilterPromoLabel] = useState(config.filterPromoLabel);
   const [filterAvailableLabel, setFilterAvailableLabel] = useState(config.filterAvailableLabel);
@@ -83,6 +84,7 @@ const AdminDashboard = () => {
     setShowBanner(config.showBanner);
     setBannerPositionX(String(config.bannerPositionX));
     setBannerPositionY(String(config.bannerPositionY));
+    setShowHeaderName(config.showHeaderName);
     setFilterAllLabel(config.filterAllLabel);
     setFilterPromoLabel(config.filterPromoLabel);
     setFilterAvailableLabel(config.filterAvailableLabel);
@@ -112,6 +114,7 @@ const AdminDashboard = () => {
         showBanner,
         bannerPositionX: Number(bannerPositionX),
         bannerPositionY: Number(bannerPositionY),
+        showHeaderName,
         filterAllLabel: filterAllLabel.trim() || "Todos",
         filterPromoLabel: filterPromoLabel.trim() || "Ofertas",
         filterAvailableLabel: filterAvailableLabel.trim() || "Disponiveis",
@@ -490,7 +493,7 @@ const AdminDashboard = () => {
             </Card>
 
             <Card className="rounded-lg">
-              <CardHeader><CardTitle>Banner da vitrine</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Banner do topo</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <Label>Imagem do banner</Label>
@@ -510,7 +513,12 @@ const AdminDashboard = () => {
 
                     <div className="flex items-center gap-2">
                       <Switch checked={showBanner} onCheckedChange={checked => { setStoreFormDirty(true); setShowBanner(checked); }} />
-                      <Label>Banner visivel na vitrine</Label>
+                      <Label>Banner visivel no topo da vitrine</Label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Switch checked={showHeaderName} onCheckedChange={checked => { setStoreFormDirty(true); setShowHeaderName(checked); }} />
+                      <Label>Nome da loja visivel sobre o banner</Label>
                     </div>
 
                     <div>

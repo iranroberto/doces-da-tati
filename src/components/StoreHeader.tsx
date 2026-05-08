@@ -12,9 +12,16 @@ const StoreHeader = ({ onCartOpen }: StoreHeaderProps) => {
   const match = config.name.match(/^(.*?)(vizio)$/i);
   const prefixName = match?.[1]?.trim();
   const scriptName = match?.[2] || config.name;
+  const hasBanner = config.showBanner && config.bannerImage;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-primary-foreground/15 bg-primary text-primary-foreground shadow-lg">
+    <header
+      className="sticky top-0 z-40 border-b border-primary-foreground/15 bg-primary bg-cover text-primary-foreground shadow-lg"
+      style={hasBanner ? {
+        backgroundImage: `linear-gradient(90deg, hsl(var(--primary) / 0.82), hsl(var(--primary) / 0.54)), url(${config.bannerImage})`,
+        backgroundPosition: `${config.bannerPositionX}% ${config.bannerPositionY}%`,
+      } : undefined}
+    >
       <div className="container mx-auto flex items-center justify-between px-4 py-5">
         <Link to="/" className="flex min-w-0 items-center gap-4 md:gap-5">
           {config.logo ? (
@@ -24,18 +31,20 @@ const StoreHeader = ({ onCartOpen }: StoreHeaderProps) => {
               <CakeSlice className="h-10 w-10 md:h-14 md:w-14" />
             </span>
           )}
-          <div className="min-w-0 overflow-visible py-2">
-            <h1 className="flex min-w-0 flex-col overflow-visible drop-shadow-sm">
-              {prefixName && (
-                <span className="font-logoSerif text-xl font-semibold uppercase leading-none tracking-[0.22em] sm:text-2xl md:text-4xl">
-                  {prefixName}
+          {config.showHeaderName && (
+            <div className="min-w-0 overflow-visible py-2">
+              <h1 className="flex min-w-0 flex-col overflow-visible drop-shadow-sm">
+                {prefixName && (
+                  <span className="font-logoSerif text-xl font-semibold uppercase leading-none tracking-[0.22em] sm:text-2xl md:text-4xl">
+                    {prefixName}
+                  </span>
+                )}
+                <span className="overflow-visible font-logo text-5xl font-normal leading-[1.05] tracking-normal sm:text-6xl md:text-8xl">
+                  {scriptName}
                 </span>
-              )}
-              <span className="overflow-visible font-logo text-5xl font-normal leading-[1.05] tracking-normal sm:text-6xl md:text-8xl">
-                {scriptName}
-              </span>
-            </h1>
-          </div>
+              </h1>
+            </div>
+          )}
         </Link>
 
         <div className="flex items-center gap-2">

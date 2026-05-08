@@ -56,21 +56,6 @@ const Index = () => {
       <StoreHeader onCartOpen={() => setCartOpen(true)} />
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
 
-      {config.showBanner && config.bannerImage && (
-        <section className="border-b border-border bg-card">
-          <div className="container mx-auto px-4 py-4">
-            <div className="overflow-hidden rounded-lg border border-border bg-muted shadow-sm">
-              <img
-                src={config.bannerImage}
-                alt={`Banner ${config.name}`}
-                className="h-40 w-full object-cover sm:h-56 md:h-72"
-                style={{ objectPosition: `${config.bannerPositionX}% ${config.bannerPositionY}%` }}
-              />
-            </div>
-          </div>
-        </section>
-      )}
-
       {promoCount > 0 && config.showFilterPromo && (
         <div className="bg-secondary py-2 text-center">
           <p className="text-sm font-bold text-secondary-foreground md:text-base">
