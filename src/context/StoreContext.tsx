@@ -106,6 +106,14 @@ const DEFAULT_CONFIG: StoreConfig = {
   pixReceiverName: "DOCES DA TATI",
   pixCity: "RIO DE JANEIRO",
   adminPassword: "bryan15",
+  filterAllLabel: "Todos",
+  filterPromoLabel: "Ofertas",
+  filterAvailableLabel: "Disponiveis",
+  categoryAllLabel: "Todas categorias",
+  showFilterAll: true,
+  showFilterPromo: true,
+  showFilterAvailable: true,
+  showCategoryFilter: true,
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -128,6 +136,20 @@ function saveLocal<T>(key: string, value: T) {
 const configForLocalStorage = (config: StoreConfig): StoreConfig => ({
   ...config,
   logo: config.logo.startsWith("data:") ? "" : config.logo,
+});
+
+const normalizeConfig = (config: Partial<StoreConfig>): StoreConfig => ({
+  ...DEFAULT_CONFIG,
+  ...config,
+  logo: normalizeLogo(config.logo ?? DEFAULT_CONFIG.logo),
+  filterAllLabel: String(config.filterAllLabel ?? DEFAULT_CONFIG.filterAllLabel),
+  filterPromoLabel: String(config.filterPromoLabel ?? DEFAULT_CONFIG.filterPromoLabel),
+  filterAvailableLabel: String(config.filterAvailableLabel ?? DEFAULT_CONFIG.filterAvailableLabel),
+  categoryAllLabel: String(config.categoryAllLabel ?? DEFAULT_CONFIG.categoryAllLabel),
+  showFilterAll: Boolean(config.showFilterAll ?? DEFAULT_CONFIG.showFilterAll),
+  showFilterPromo: Boolean(config.showFilterPromo ?? DEFAULT_CONFIG.showFilterPromo),
+  showFilterAvailable: Boolean(config.showFilterAvailable ?? DEFAULT_CONFIG.showFilterAvailable),
+  showCategoryFilter: Boolean(config.showCategoryFilter ?? DEFAULT_CONFIG.showCategoryFilter),
 });
 
 const productFromRow = (row: Record<string, unknown>): Product => ({
@@ -168,15 +190,23 @@ const categoryToRow = (category: Category, sortOrder: number) => ({
   updated_at: new Date().toISOString(),
 });
 
-const configFromRow = (row: Record<string, unknown>): StoreConfig => ({
+const configFromRow = (row: Record<string, unknown>): StoreConfig => normalizeConfig({
   name: String(row.name ?? DEFAULT_CONFIG.name),
-  logo: normalizeLogo(row.logo ?? DEFAULT_CONFIG.logo),
+  logo: String(row.logo ?? DEFAULT_CONFIG.logo),
   banner: String(row.banner ?? DEFAULT_CONFIG.banner),
   whatsapp: String(row.whatsapp ?? DEFAULT_CONFIG.whatsapp),
   pixKey: String(row.pix_key ?? DEFAULT_CONFIG.pixKey),
   pixReceiverName: String(row.pix_receiver_name ?? DEFAULT_CONFIG.pixReceiverName),
   pixCity: String(row.pix_city ?? DEFAULT_CONFIG.pixCity),
   adminPassword: String(row.admin_password ?? DEFAULT_CONFIG.adminPassword),
+  filterAllLabel: String(row.filter_all_label ?? DEFAULT_CONFIG.filterAllLabel),
+  filterPromoLabel: String(row.filter_promo_label ?? DEFAULT_CONFIG.filterPromoLabel),
+  filterAvailableLabel: String(row.filter_available_label ?? DEFAULT_CONFIG.filterAvailableLabel),
+  categoryAllLabel: String(row.category_all_label ?? DEFAULT_CONFIG.categoryAllLabel),
+  showFilterAll: Boolean(row.show_filter_all ?? DEFAULT_CONFIG.showFilterAll),
+  showFilterPromo: Boolean(row.show_filter_promo ?? DEFAULT_CONFIG.showFilterPromo),
+  showFilterAvailable: Boolean(row.show_filter_available ?? DEFAULT_CONFIG.showFilterAvailable),
+  showCategoryFilter: Boolean(row.show_category_filter ?? DEFAULT_CONFIG.showCategoryFilter),
 });
 
 const configToRow = (config: StoreConfig) => ({
@@ -189,6 +219,14 @@ const configToRow = (config: StoreConfig) => ({
   pix_receiver_name: config.pixReceiverName,
   pix_city: config.pixCity,
   admin_password: config.adminPassword,
+  filter_all_label: config.filterAllLabel,
+  filter_promo_label: config.filterPromoLabel,
+  filter_available_label: config.filterAvailableLabel,
+  category_all_label: config.categoryAllLabel,
+  show_filter_all: config.showFilterAll,
+  show_filter_promo: config.showFilterPromo,
+  show_filter_available: config.showFilterAvailable,
+  show_category_filter: config.showCategoryFilter,
   updated_at: new Date().toISOString(),
 });
 
@@ -219,7 +257,7 @@ const StoreContext = createContext<StoreContextType | null>(null);
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [config, setConfigState] = useState<StoreConfig>(() => {
     const storedConfig = load("store_config", DEFAULT_CONFIG);
-    return { ...storedConfig, logo: normalizeLogo(storedConfig.logo) };
+    return normalizeConfig(storedConfig);
   });
   const [categories, setCategoriesState] = useState<Category[]>(() => load("store_categories", DEFAULT_CATEGORIES));
   const [products, setProductsState] = useState<Product[]>(() => load("store_products", DEFAULT_PRODUCTS));
@@ -246,7 +284,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (categoriesResult.error) throw categoriesResult.error;
     if (productsResult.error) throw productsResult.error;
 
-    let nextConfig = configResult.data ? configFromRow(configResult.data) : load("store_config", DEFAULT_CONFIG);
+    let nextConfig = configResult.data ? configFromRow(configResult.data) : normalizeConfig(load("store_config", DEFAULT_CONFIG));
     let nextCategories = categoriesResult.data?.length
       ? categoriesResult.data.map(categoryFromRow)
       : load("store_categories", DEFAULT_CATEGORIES);
@@ -256,7 +294,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (!configResult.data) {
       const storedFallbackConfig = load("store_config", DEFAULT_CONFIG);
-      const fallbackConfig = { ...storedFallbackConfig, logo: normalizeLogo(storedFallbackConfig.logo) };
+      const fallbackConfig = normalizeConfig(storedFallbackConfig);
       const { error } = await supabase.from("store_config").upsert(configToRow(fallbackConfig));
       if (error) throw error;
       nextConfig = fallbackConfig;

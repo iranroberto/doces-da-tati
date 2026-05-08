@@ -24,6 +24,14 @@ export interface StoreConfig {
   pixReceiverName: string;
   pixCity: string;
   adminPassword: string;
+  filterAllLabel: string;
+  filterPromoLabel: string;
+  filterAvailableLabel: string;
+  categoryAllLabel: string;
+  showFilterAll: boolean;
+  showFilterPromo: boolean;
+  showFilterAvailable: boolean;
+  showCategoryFilter: boolean;
 }
 
 export interface CartItem {

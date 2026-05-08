@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { PackageCheck, Search } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
@@ -36,15 +36,30 @@ const Index = () => {
 
   const promoCount = products.filter(product => product.isPromo).length;
   const availableCount = products.filter(product => product.stock > 0).length;
+  const productFilters = [
+    { id: "all" as const, label: config.filterAllLabel, visible: config.showFilterAll },
+    { id: "promo" as const, label: config.filterPromoLabel, visible: config.showFilterPromo },
+    { id: "available" as const, label: config.filterAvailableLabel, visible: config.showFilterAvailable },
+  ].filter(item => item.visible && item.label.trim());
+
+  useEffect(() => {
+    if (filter === "promo" && !config.showFilterPromo) setFilter("all");
+    if (filter === "available" && !config.showFilterAvailable) setFilter("all");
+  }, [config.showFilterAvailable, config.showFilterPromo, filter]);
+
+  useEffect(() => {
+    if (!config.showCategoryFilter) setCategoryFilter("all");
+  }, [config.showCategoryFilter]);
+
   return (
     <div className="min-h-screen bg-background">
       <StoreHeader onCartOpen={() => setCartOpen(true)} />
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
 
-      {promoCount > 0 && (
+      {promoCount > 0 && config.showFilterPromo && (
         <div className="bg-secondary py-2 text-center">
           <p className="text-sm font-bold text-secondary-foreground md:text-base">
-            Ofertas especiais disponiveis hoje. Aproveite enquanto durar o estoque.
+            {config.filterPromoLabel} especiais disponiveis hoje. Aproveite enquanto durar o estoque.
           </p>
         </div>
       )}
@@ -63,22 +78,26 @@ const Index = () => {
           </div>
         </div>
 
-        <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-2">
-          <Button variant={filter === "all" ? "default" : "outline"} size="sm" className="shrink-0" onClick={() => setFilter("all")}>
-            Todos
-          </Button>
-          <Button variant={filter === "promo" ? "default" : "outline"} size="sm" className="shrink-0" onClick={() => setFilter("promo")}>
-            Ofertas
-          </Button>
-          <Button variant={filter === "available" ? "default" : "outline"} size="sm" className="shrink-0" onClick={() => setFilter("available")}>
-            Disponiveis
-          </Button>
-        </div>
+        {productFilters.length > 0 && (
+          <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-2">
+            {productFilters.map(item => (
+              <Button
+                key={item.id}
+                variant={filter === item.id ? "default" : "outline"}
+                size="sm"
+                className="shrink-0"
+                onClick={() => setFilter(item.id)}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        )}
 
-        {visibleCategories.length > 0 && (
+        {visibleCategories.length > 0 && config.showCategoryFilter && (
           <div className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-2">
             <Button variant={categoryFilter === "all" ? "secondary" : "outline"} size="sm" className="shrink-0" onClick={() => setCategoryFilter("all")}>
-              Todas categorias
+              {config.categoryAllLabel}
             </Button>
             {visibleCategories.map(category => (
               <Button

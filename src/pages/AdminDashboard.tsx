@@ -42,6 +42,14 @@ const AdminDashboard = () => {
   const [pixReceiverName, setPixReceiverName] = useState(config.pixReceiverName);
   const [pixCity, setPixCity] = useState(config.pixCity);
   const [adminPw, setAdminPw] = useState(config.adminPassword);
+  const [filterAllLabel, setFilterAllLabel] = useState(config.filterAllLabel);
+  const [filterPromoLabel, setFilterPromoLabel] = useState(config.filterPromoLabel);
+  const [filterAvailableLabel, setFilterAvailableLabel] = useState(config.filterAvailableLabel);
+  const [categoryAllLabel, setCategoryAllLabel] = useState(config.categoryAllLabel);
+  const [showFilterAll, setShowFilterAll] = useState(config.showFilterAll);
+  const [showFilterPromo, setShowFilterPromo] = useState(config.showFilterPromo);
+  const [showFilterAvailable, setShowFilterAvailable] = useState(config.showFilterAvailable);
+  const [showCategoryFilter, setShowCategoryFilter] = useState(config.showCategoryFilter);
   const [saveMessage, setSaveMessage] = useState("");
   const [storeFormDirty, setStoreFormDirty] = useState(false);
 
@@ -67,6 +75,14 @@ const AdminDashboard = () => {
     setPixReceiverName(config.pixReceiverName);
     setPixCity(config.pixCity);
     setAdminPw(config.adminPassword);
+    setFilterAllLabel(config.filterAllLabel);
+    setFilterPromoLabel(config.filterPromoLabel);
+    setFilterAvailableLabel(config.filterAvailableLabel);
+    setCategoryAllLabel(config.categoryAllLabel);
+    setShowFilterAll(config.showFilterAll);
+    setShowFilterPromo(config.showFilterPromo);
+    setShowFilterAvailable(config.showFilterAvailable);
+    setShowCategoryFilter(config.showCategoryFilter);
   }, [config, storeFormDirty]);
 
   if (!isAdmin) {
@@ -84,6 +100,14 @@ const AdminDashboard = () => {
         pixReceiverName: pixReceiverName.trim() || "DOCES DA TATI",
         pixCity: pixCity.trim() || "RIO DE JANEIRO",
         adminPassword: adminPw || "bryan15",
+        filterAllLabel: filterAllLabel.trim() || "Todos",
+        filterPromoLabel: filterPromoLabel.trim() || "Ofertas",
+        filterAvailableLabel: filterAvailableLabel.trim() || "Disponiveis",
+        categoryAllLabel: categoryAllLabel.trim() || "Todas categorias",
+        showFilterAll,
+        showFilterPromo,
+        showFilterAvailable,
+        showCategoryFilter,
       });
       setStoreFormDirty(false);
       setSaveMessage("Configuracoes salvas com sucesso!");
@@ -364,6 +388,54 @@ const AdminDashboard = () => {
                 <div>
                   <Label>Senha do Admin</Label>
                   <Input type="password" value={adminPw} onChange={e => { setStoreFormDirty(true); setAdminPw(e.target.value); }} />
+                </div>
+                <div className="rounded-lg border border-border bg-muted/40 p-4">
+                  <h3 className="mb-3 text-base font-bold">Filtros da vitrine</h3>
+                  <div className="space-y-4">
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                      <div>
+                        <Label>Nome do filtro principal</Label>
+                        <Input value={filterAllLabel} onChange={e => { setStoreFormDirty(true); setFilterAllLabel(e.target.value); }} />
+                      </div>
+                      <div className="flex items-center gap-2 pb-2">
+                        <Switch checked={showFilterAll} onCheckedChange={checked => { setStoreFormDirty(true); setShowFilterAll(checked); }} />
+                        <Label>Visivel</Label>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                      <div>
+                        <Label>Nome do filtro de ofertas</Label>
+                        <Input value={filterPromoLabel} onChange={e => { setStoreFormDirty(true); setFilterPromoLabel(e.target.value); }} />
+                      </div>
+                      <div className="flex items-center gap-2 pb-2">
+                        <Switch checked={showFilterPromo} onCheckedChange={checked => { setStoreFormDirty(true); setShowFilterPromo(checked); }} />
+                        <Label>Visivel</Label>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                      <div>
+                        <Label>Nome do filtro disponiveis</Label>
+                        <Input value={filterAvailableLabel} onChange={e => { setStoreFormDirty(true); setFilterAvailableLabel(e.target.value); }} />
+                      </div>
+                      <div className="flex items-center gap-2 pb-2">
+                        <Switch checked={showFilterAvailable} onCheckedChange={checked => { setStoreFormDirty(true); setShowFilterAvailable(checked); }} />
+                        <Label>Visivel</Label>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                      <div>
+                        <Label>Nome do filtro de categorias</Label>
+                        <Input value={categoryAllLabel} onChange={e => { setStoreFormDirty(true); setCategoryAllLabel(e.target.value); }} />
+                      </div>
+                      <div className="flex items-center gap-2 pb-2">
+                        <Switch checked={showCategoryFilter} onCheckedChange={checked => { setStoreFormDirty(true); setShowCategoryFilter(checked); }} />
+                        <Label>Visivel</Label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 {saveMessage && (
                   <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
