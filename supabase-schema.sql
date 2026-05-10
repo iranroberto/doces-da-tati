@@ -23,6 +23,7 @@ create table if not exists public.products (
   id text primary key,
   name text not null,
   price numeric not null default 0,
+  promotional_price numeric,
   description text not null default '',
   image text not null default '',
   category_id text not null default '',
@@ -40,8 +41,52 @@ create table if not exists public.categories (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.clientes (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  telefone text not null unique,
+  empresa_unidade text not null default '',
+  status text not null default 'ativo' check (status in ('ativo', 'bloqueado')),
+  limite numeric not null default 20,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+
+create table if not exists public.pedidos (
+  id uuid primary key default gen_random_uuid(),
+  cliente_id uuid references public.clientes(id) on delete set null,
+  status text not null default 'aberto',
+  total numeric not null default 0,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+
+create table if not exists public.pagamentos (
+  id uuid primary key default gen_random_uuid(),
+  cliente_id uuid references public.clientes(id) on delete set null,
+  pedido_id uuid references public.pedidos(id) on delete set null,
+  valor numeric not null default 0,
+  metodo text not null default 'pix',
+  status text not null default 'pendente',
+  criado_em timestamptz not null default now()
+);
+
+create table if not exists public.dividas (
+  id uuid primary key default gen_random_uuid(),
+  cliente_id uuid references public.clientes(id) on delete cascade,
+  pedido_id uuid references public.pedidos(id) on delete set null,
+  valor numeric not null default 0,
+  status text not null default 'aberta',
+  vencimento date,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+
 alter table public.products
   add column if not exists category_id text not null default '';
+
+alter table public.products
+  add column if not exists promotional_price numeric;
 
 alter table public.store_config
   add column if not exists filter_all_label text not null default 'Todos',
@@ -56,6 +101,10 @@ alter table public.store_config
 alter table public.store_config enable row level security;
 alter table public.products enable row level security;
 alter table public.categories enable row level security;
+alter table public.clientes enable row level security;
+alter table public.pedidos enable row level security;
+alter table public.pagamentos enable row level security;
+alter table public.dividas enable row level security;
 
 drop policy if exists "Public can read store config" on public.store_config;
 drop policy if exists "Public can write store config" on public.store_config;
@@ -63,6 +112,14 @@ drop policy if exists "Public can read categories" on public.categories;
 drop policy if exists "Public can write categories" on public.categories;
 drop policy if exists "Public can read products" on public.products;
 drop policy if exists "Public can write products" on public.products;
+drop policy if exists "Public can read clients" on public.clientes;
+drop policy if exists "Public can write clients" on public.clientes;
+drop policy if exists "Public can read orders" on public.pedidos;
+drop policy if exists "Public can write orders" on public.pedidos;
+drop policy if exists "Public can read payments" on public.pagamentos;
+drop policy if exists "Public can write payments" on public.pagamentos;
+drop policy if exists "Public can read debts" on public.dividas;
+drop policy if exists "Public can write debts" on public.dividas;
 
 create policy "Public can read store config"
   on public.store_config for select
@@ -88,6 +145,42 @@ create policy "Public can read products"
 
 create policy "Public can write products"
   on public.products for all
+  using (true)
+  with check (true);
+
+create policy "Public can read clients"
+  on public.clientes for select
+  using (true);
+
+create policy "Public can write clients"
+  on public.clientes for all
+  using (true)
+  with check (true);
+
+create policy "Public can read orders"
+  on public.pedidos for select
+  using (true);
+
+create policy "Public can write orders"
+  on public.pedidos for all
+  using (true)
+  with check (true);
+
+create policy "Public can read payments"
+  on public.pagamentos for select
+  using (true);
+
+create policy "Public can write payments"
+  on public.pagamentos for all
+  using (true)
+  with check (true);
+
+create policy "Public can read debts"
+  on public.dividas for select
+  using (true);
+
+create policy "Public can write debts"
+  on public.dividas for all
   using (true)
   with check (true);
 

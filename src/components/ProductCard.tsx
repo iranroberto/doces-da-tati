@@ -1,19 +1,39 @@
 import { Package, ShoppingCart, Star } from "lucide-react";
+import { toast } from "sonner";
 import { Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
+import { getProductPrice, hasPromotionalPrice } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
 
 const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
 const ProductCard = ({ product }: { product: Product }) => {
-  const { addToCart, categories } = useStore();
+  const { addToCart, cart, categories } = useStore();
   const isSoldOut = product.stock === 0;
   const category = categories.find(item => item.id === product.categoryId);
+  const cartItem = cart.find(item => item.product.id === product.id);
+  const cartQuantity = cartItem?.quantity ?? 0;
+  const productPrice = getProductPrice(product);
+  const showPromotionalPrice = hasPromotionalPrice(product);
+
+  const handleBuy = () => {
+    if (cartQuantity >= product.stock) {
+      toast.error("Estoque maximo no carrinho", {
+        description: `${product.name} ja esta com ${product.stock} un. no carrinho.`,
+      });
+      return;
+    }
+
+    addToCart(product);
+    toast.success("Item adicionado ao carrinho", {
+      description: `${product.name} - ${formatPrice(productPrice)}`,
+    });
+  };
 
   return (
     <article className="group relative overflow-hidden rounded-lg border border-border bg-card shadow-sm ring-1 ring-transparent transition duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:ring-primary/10">
-      {product.isPromo && (
+      {(product.isPromo || showPromotionalPrice) && (
         <div className="absolute left-3 top-3 z-10 animate-pulse-promo">
           <span className="inline-flex items-center gap-1 rounded-full bg-promo px-3 py-1 text-xs font-bold uppercase tracking-wide text-promo-foreground shadow-lg">
             <Star className="h-3 w-3 fill-current" /> Oferta
@@ -43,7 +63,14 @@ const ProductCard = ({ product }: { product: Product }) => {
         </div>
 
         <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
-          <span className="text-base font-extrabold text-primary sm:text-2xl">{formatPrice(product.price)}</span>
+          <div className="min-w-0">
+            {showPromotionalPrice && (
+              <span className="block text-xs font-semibold text-muted-foreground line-through sm:text-sm">
+                {formatPrice(product.price)}
+              </span>
+            )}
+            <span className="block text-base font-extrabold text-primary sm:text-2xl">{formatPrice(productPrice)}</span>
+          </div>
           <span className="flex w-fit shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
             <Package className="h-3 w-3" /> {product.stock > 0 ? `${product.stock} un.` : "sem estoque"}
           </span>
@@ -54,7 +81,7 @@ const ProductCard = ({ product }: { product: Product }) => {
             className="w-full gap-2 font-semibold"
             size="sm"
             disabled={isSoldOut}
-            onClick={() => addToCart(product)}
+            onClick={handleBuy}
           >
             <ShoppingCart className="h-4 w-4" /> Comprar
           </Button>

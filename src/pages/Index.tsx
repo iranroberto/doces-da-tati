@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { PackageCheck, Search } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
 import CartDrawer from "@/components/CartDrawer";
+import CustomerAuthDialog from "@/components/CustomerAuthDialog";
 import ProductCard from "@/components/ProductCard";
 import StoreHeader from "@/components/StoreHeader";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ type ProductFilter = "all" | "promo" | "available";
 const Index = () => {
   const { config, categories, products } = useStore();
   const [cartOpen, setCartOpen] = useState(false);
+  const [customerAuthOpen, setCustomerAuthOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ProductFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -53,8 +55,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <StoreHeader onCartOpen={() => setCartOpen(true)} />
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+      <StoreHeader onCartOpen={() => setCartOpen(true)} onCustomerAuthOpen={() => setCustomerAuthOpen(true)} />
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} onCustomerAuthOpen={() => setCustomerAuthOpen(true)} />
+      <CustomerAuthDialog open={customerAuthOpen} onOpenChange={setCustomerAuthOpen} />
 
       {promoCount > 0 && config.showFilterPromo && (
         <div className="bg-secondary py-2 text-center">

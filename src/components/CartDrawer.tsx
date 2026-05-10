@@ -1,60 +1,46 @@
-import { useEffect, useState } from "react";
 import { MessageCircle, Minus, Package, Plus, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
+import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useStore } from "@/context/StoreContext";
+import { getProductPrice } from "@/lib/pricing";
+import { formatPhone } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import type { CustomerInfo } from "@/types/store";
 
 interface CartDrawerProps {
   open: boolean;
   onClose: () => void;
+  onCustomerAuthOpen: () => void;
 }
 
 const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
-const loadCustomerInfo = (): CustomerInfo => {
-  try {
-    const raw = localStorage.getItem("customer_info");
-    const value = raw ? JSON.parse(raw) : {};
-    return {
-      name: String(value.name ?? ""),
-      whatsapp: String(value.whatsapp ?? ""),
-    };
-  } catch {
-    return { name: "", whatsapp: "" };
-  }
-};
-
-const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
+const CartDrawer = ({ open, onClose, onCustomerAuthOpen }: CartDrawerProps) => {
   const { cart, updateCartQty, removeFromCart, clearCart, cartTotal, config } = useStore();
-  const [customer, setCustomer] = useState<CustomerInfo>(() => loadCustomerInfo());
-
-  useEffect(() => {
-    localStorage.setItem("customer_info", JSON.stringify(customer));
-  }, [customer]);
+  const { customer } = useCustomerAuth();
 
   const finishOrder = () => {
-    const customerName = String(customer.name ?? "").trim();
-    const customerWhatsapp = String(customer.whatsapp ?? "").replace(/\D/g, "");
-
-    if (!customerName || customerWhatsapp.length < 10) {
-      toast.error("Informe seu nome e WhatsApp para finalizar.");
+    if (!customer) {
+      toast.error("Entre com seu telefone para finalizar.");
+      onCustomerAuthOpen();
       return;
     }
 
     const order = {
       createdAt: new Date().toISOString(),
       customer: {
-        name: customerName,
-        whatsapp: customerWhatsapp,
+        id: customer.id,
+        name: customer.nome,
+        whatsapp: customer.telefone,
+        companyUnit: customer.empresa_unidade,
+        status: customer.status,
+        limit: customer.limite,
       },
       items: cart.map(item => ({
         productId: item.product.id,
         name: item.product.name,
-        price: item.product.price,
+        price: getProductPrice(item.product),
         quantity: item.quantity,
         image: item.product.image,
       })),
@@ -93,7 +79,7 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{item.product.name}</p>
-                  <p className="text-sm font-bold text-primary">{formatPrice(item.product.price * item.quantity)}</p>
+                  <p className="text-sm font-bold text-primary">{formatPrice(getProductPrice(item.product) * item.quantity)}</p>
                   <div className="mt-1 flex items-center gap-2">
                     <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => updateCartQty(item.product.id, item.quantity - 1)}>
                       <Minus className="h-3 w-3" />
@@ -119,21 +105,23 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <UserRound className="h-4 w-4" />
                 </span>
-                <p className="font-bold">Login do cliente</p>
+                <p className="font-bold">Cliente</p>
               </div>
-              <div className="space-y-2">
-                <Input
-                  value={customer.name}
-                  onChange={event => setCustomer(current => ({ ...current, name: event.target.value }))}
-                  placeholder="Seu nome"
-                />
-                <Input
-                  value={customer.whatsapp}
-                  onChange={event => setCustomer(current => ({ ...current, whatsapp: event.target.value }))}
-                  inputMode="tel"
-                  placeholder="WhatsApp com DDD"
-                />
-              </div>
+              {customer ? (
+                <div className="space-y-1 text-sm">
+                  <p className="font-bold">{customer.nome}</p>
+                  <p className="text-muted-foreground">{formatPhone(customer.telefone)}</p>
+                  <p className="text-muted-foreground">{customer.empresa_unidade}</p>
+                  <div className="mt-2 flex items-center justify-between rounded-md bg-background px-3 py-2">
+                    <span className="text-xs font-semibold uppercase text-muted-foreground">Limite fiado</span>
+                    <span className="font-bold text-primary">{formatPrice(customer.limite)}</span>
+                  </div>
+                </div>
+              ) : (
+                <Button className="w-full gap-2" onClick={onCustomerAuthOpen}>
+                  <UserRound className="h-4 w-4" /> Entrar ou criar conta
+                </Button>
+              )}
             </div>
             <div className="flex w-full items-center justify-between text-lg font-bold">
               <span>Total:</span>

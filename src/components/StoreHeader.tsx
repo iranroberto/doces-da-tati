@@ -1,14 +1,17 @@
 import { Link } from "react-router-dom";
-import { CakeSlice, ShoppingCart } from "lucide-react";
+import { CakeSlice, LogOut, ShoppingCart, UserRound } from "lucide-react";
+import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useStore } from "@/context/StoreContext";
 import { Button } from "@/components/ui/button";
 
 interface StoreHeaderProps {
   onCartOpen: () => void;
+  onCustomerAuthOpen: () => void;
 }
 
-const StoreHeader = ({ onCartOpen }: StoreHeaderProps) => {
+const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
   const { config, cartCount } = useStore();
+  const { customer, logoutCustomer } = useCustomerAuth();
   const match = config.name.match(/^(.*?)(vizio)$/i);
   const prefixName = match?.[1]?.trim();
   const scriptName = match?.[2] || config.name;
@@ -49,6 +52,25 @@ const StoreHeader = ({ onCartOpen }: StoreHeaderProps) => {
         </Link>
 
         <div className="flex items-center gap-2">
+          {customer ? (
+            <>
+              <div className="hidden items-center gap-2 rounded-full bg-primary-foreground/12 px-3 py-2 text-sm font-bold sm:flex">
+                <UserRound className="h-4 w-4" />
+                <span className="max-w-32 truncate">{customer.nome.split(" ")[0] || customer.nome}</span>
+                <button className="text-primary-foreground/80 hover:text-primary-foreground" onClick={logoutCustomer} aria-label="Sair da conta">
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+              <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20 sm:hidden" onClick={logoutCustomer} aria-label="Sair da conta">
+                <UserRound className="h-5 w-5" />
+              </Button>
+            </>
+          ) : (
+            <Button variant="ghost" className="gap-2 text-primary-foreground hover:bg-primary-foreground/20" onClick={onCustomerAuthOpen}>
+              <UserRound className="h-5 w-5" />
+              <span className="hidden sm:inline">Entrar</span>
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="relative text-primary-foreground hover:bg-primary-foreground/20" onClick={onCartOpen} aria-label="Abrir carrinho">
             <ShoppingCart className="h-6 w-6" />
             {cartCount > 0 && (

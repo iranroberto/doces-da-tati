@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { CartItem, Category, Product, StoreConfig } from "@/types/store";
+import { getProductPrice } from "@/lib/pricing";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const productImage = (fileName: string) => fileName ? `/produtos/${fileName}` : "";
@@ -218,6 +219,7 @@ const productFromRow = (row: Record<string, unknown>): Product => ({
   id: String(row.id),
   name: String(row.name ?? ""),
   price: Number(row.price ?? 0),
+  promotionalPrice: row.promotional_price === null || row.promotional_price === undefined ? undefined : Number(row.promotional_price),
   description: String(row.description ?? ""),
   image: String(row.image ?? ""),
   categoryId: String(row.category_id ?? ""),
@@ -225,10 +227,21 @@ const productFromRow = (row: Record<string, unknown>): Product => ({
   stock: Number(row.stock ?? 0),
 });
 
+const mergeLocalPromotionalPrices = (remoteProducts: Product[]) => {
+  const localProducts = load("store_products", DEFAULT_PRODUCTS);
+  const localById = new Map(localProducts.map(product => [product.id, product.promotionalPrice]));
+
+  return remoteProducts.map(product => ({
+    ...product,
+    promotionalPrice: localById.get(product.id),
+  }));
+};
+
 const productToRow = (product: Product, sortOrder: number) => ({
   id: product.id,
   name: product.name,
   price: product.price,
+  promotional_price: product.promotionalPrice ?? null,
   description: product.description,
   image: product.image,
   category_id: product.categoryId,
@@ -237,6 +250,29 @@ const productToRow = (product: Product, sortOrder: number) => ({
   sort_order: sortOrder,
   updated_at: new Date().toISOString(),
 });
+
+const isMissingPromotionalPriceColumn = (error: { code?: string; message?: string } | null) =>
+  error?.code === "42703" || String(error?.message ?? "").includes("promotional_price");
+
+const upsertProductsOnline = async (nextProducts: Product[]) => {
+  if (!supabase) return true;
+
+  const rows = nextProducts.map(productToRow);
+  const { error } = await supabase.from("products").upsert(rows);
+
+  if (!error) return true;
+
+  if (isMissingPromotionalPriceColumn(error)) {
+    const legacyRows = rows.map(({ promotional_price: _promotionalPrice, ...row }) => row);
+    const { error: legacyError } = await supabase.from("products").upsert(legacyRows);
+    if (legacyError) throw legacyError;
+
+    console.warn("A coluna products.promotional_price ainda nao existe no Supabase. Produto salvo sem preco promocional online.");
+    return false;
+  }
+
+  throw error;
+};
 
 const categoryFromRow = (row: Record<string, unknown>): Category => ({
   id: String(row.id),
@@ -302,6 +338,7 @@ interface StoreContextType {
   deleteCategory: (categoryId: string) => Promise<void>;
   products: Product[];
   setProducts: (p: Product[]) => Promise<void>;
+  isPromotionalPriceOnlineEnabled: boolean | null;
   deleteProduct: (productId: string) => Promise<void>;
   isLoading: boolean;
   cart: CartItem[];
@@ -325,6 +362,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
   const [categories, setCategoriesState] = useState<Category[]>(() => load("store_categories", DEFAULT_CATEGORIES));
   const [products, setProductsState] = useState<Product[]>(() => load("store_products", DEFAULT_PRODUCTS));
+  const [isPromotionalPriceOnlineEnabled, setIsPromotionalPriceOnlineEnabled] = useState<boolean | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem("admin") === "1");
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
@@ -347,6 +385,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (configResult.error) throw configResult.error;
     if (categoriesResult.error) throw categoriesResult.error;
     if (productsResult.error) throw productsResult.error;
+    const productsHavePromotionalPriceColumn = productsResult.data?.some(row => "promotional_price" in row) ?? true;
+    setIsPromotionalPriceOnlineEnabled(productsHavePromotionalPriceColumn);
 
     let nextConfig = configResult.data ? configFromRow(configResult.data) : normalizeConfig(load("store_config", DEFAULT_CONFIG));
     let nextCategories = categoriesResult.data?.length
@@ -355,6 +395,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let nextProducts = productsResult.data?.length
       ? productsResult.data.map(productFromRow)
       : load("store_products", DEFAULT_PRODUCTS);
+
+    if (productsResult.data?.length && !productsHavePromotionalPriceColumn) {
+      nextProducts = mergeLocalPromotionalPrices(nextProducts);
+    }
 
     if (!configResult.data) {
       const storedFallbackConfig = load("store_config", DEFAULT_CONFIG);
@@ -373,8 +417,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (!productsResult.data?.length) {
       const fallbackProducts = load("store_products", DEFAULT_PRODUCTS);
-      const { error } = await supabase.from("products").upsert(fallbackProducts.map(productToRow));
-      if (error) throw error;
+      setIsPromotionalPriceOnlineEnabled(await upsertProductsOnline(fallbackProducts));
       nextProducts = fallbackProducts;
     }
 
@@ -452,9 +495,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setProductsState(nextProducts);
     saveLocal("store_products", nextProducts);
 
-    if (!supabase) return;
-    const { error } = await supabase.from("products").upsert(nextProducts.map(productToRow));
-    if (error) throw error;
+    setIsPromotionalPriceOnlineEnabled(await upsertProductsOnline(nextProducts));
   }, []);
 
   const deleteProduct = useCallback(async (productId: string) => {
@@ -479,11 +520,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     saveLocal("store_products", nextProducts);
 
     if (!supabase) return;
-    const [{ error: productError }, { error: categoryError }] = await Promise.all([
-      supabase.from("products").upsert(nextProducts.map(productToRow)),
+    const [, { error: categoryError }] = await Promise.all([
+      upsertProductsOnline(nextProducts),
       supabase.from("categories").delete().eq("id", categoryId),
     ]);
-    if (productError) throw productError;
     if (categoryError) throw categoryError;
   }, [categories, products]);
 
@@ -513,7 +553,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const clearCart = useCallback(() => setCart([]), []);
 
-  const cartTotal = cart.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+  const cartTotal = cart.reduce((sum, i) => sum + getProductPrice(i.product) * i.quantity, 0);
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
   const login = useCallback((password: string) => {
@@ -532,7 +572,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   return (
-    <StoreContext.Provider value={{ config, setConfig, categories, setCategories, deleteCategory, products, setProducts, deleteProduct, isLoading, cart, addToCart, removeFromCart, updateCartQty, clearCart, cartTotal, cartCount, isAdmin, login, logout }}>
+    <StoreContext.Provider value={{ config, setConfig, categories, setCategories, deleteCategory, products, setProducts, deleteProduct, isPromotionalPriceOnlineEnabled, isLoading, cart, addToCart, removeFromCart, updateCartQty, clearCart, cartTotal, cartCount, isAdmin, login, logout }}>
       {children}
     </StoreContext.Provider>
   );

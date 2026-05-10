@@ -3,6 +3,7 @@ import { HashRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { CustomerAuthProvider } from "@/context/CustomerAuthContext";
 import { StoreProvider } from "@/context/StoreContext";
 import Index from "./pages/Index";
 import Checkout from "./pages/Checkout";
@@ -19,13 +20,15 @@ const App = () => (
       <Sonner />
       <HashRouter>
         <StoreProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/checkout" element={<Checkout />} />
-            <Route path="/admin" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <CustomerAuthProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/admin" element={<AdminLogin />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </CustomerAuthProvider>
         </StoreProvider>
       </HashRouter>
     </TooltipProvider>

@@ -2,6 +2,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  promotionalPrice?: number;
   description: string;
   image: string;
   categoryId: string;
@@ -48,4 +49,16 @@ export interface CartItem {
 export interface CustomerInfo {
   name: string;
   whatsapp: string;
+}
+
+export type CustomerStatus = "ativo" | "bloqueado";
+
+export interface Customer {
+  id: string;
+  nome: string;
+  telefone: string;
+  empresa_unidade: string;
+  status: CustomerStatus;
+  limite: number;
+  criado_em: string;
 }

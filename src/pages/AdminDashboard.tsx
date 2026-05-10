@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BarChart3, CheckCircle2, ClipboardList, DollarSign, Image, LogOut, Package, Pencil, Plus, Save, Store, Tags, Trash2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Category, Product } from "@/types/store";
+import { Category, Customer, Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
+import { getProductPrice, hasPromotionalPrice } from "@/lib/pricing";
+import { formatPhone } from "@/lib/phone";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,6 +26,18 @@ const fileToBase64 = (file: File): Promise<string> =>
 const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
+const productSignature = (product: Product) => JSON.stringify({
+  id: product.id,
+  name: product.name,
+  price: product.price,
+  promotionalPrice: product.promotionalPrice ?? null,
+  description: product.description,
+  image: product.image,
+  categoryId: product.categoryId,
+  isPromo: product.isPromo,
+  stock: product.stock,
+});
+
 const slugify = (value: string) =>
   value
     .normalize("NFD")
@@ -32,7 +47,7 @@ const slugify = (value: string) =>
     .replace(/^-+|-+$/g, "");
 
 const AdminDashboard = () => {
-  const { config, setConfig, categories, setCategories, deleteCategory, products, setProducts, deleteProduct, logout, isAdmin, isLoading } = useStore();
+  const { config, setConfig, categories, setCategories, deleteCategory, products, setProducts, deleteProduct, isPromotionalPriceOnlineEnabled, logout, isAdmin, isLoading } = useStore();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"dashboard" | "store" | "categories" | "products" | "orders" | "clients">("dashboard");
 
@@ -61,8 +76,10 @@ const AdminDashboard = () => {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const lastAutoSavedProduct = useRef("");
   const [pName, setPName] = useState("");
   const [pPrice, setPPrice] = useState("");
+  const [pPromotionalPrice, setPPromotionalPrice] = useState("");
   const [pDesc, setPDesc] = useState("");
   const [pImage, setPImage] = useState("");
   const [pCategoryId, setPCategoryId] = useState("");
@@ -71,6 +88,40 @@ const AdminDashboard = () => {
   const [categoryName, setCategoryName] = useState("");
   const [categoryActive, setCategoryActive] = useState(true);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [autoSaveMessage, setAutoSaveMessage] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+
+  const buildProductData = (productId: string): { product?: Product; error?: string } => {
+    const price = Number(pPrice);
+    const promotionalPrice = pPromotionalPrice.trim() ? Number(pPromotionalPrice) : undefined;
+
+    if (!pName.trim() || !pPrice || Number.isNaN(price)) {
+      return { error: "Preencha nome e preco corretamente" };
+    }
+
+    if (promotionalPrice !== undefined && (Number.isNaN(promotionalPrice) || promotionalPrice <= 0)) {
+      return { error: "Preencha o preco promocional corretamente" };
+    }
+
+    if (promotionalPrice !== undefined && promotionalPrice >= price) {
+      return { error: "O preco promocional deve ser menor que o preco normal" };
+    }
+
+    return {
+      product: {
+        id: productId,
+        name: pName.trim(),
+        price,
+        promotionalPrice,
+        description: pDesc,
+        image: pImage,
+        categoryId: pCategoryId,
+        isPromo: pPromo,
+        stock: Math.max(0, parseInt(pStock, 10) || 0),
+      },
+    };
+  };
 
   useEffect(() => {
     if (storeFormDirty) return;
@@ -96,6 +147,75 @@ const AdminDashboard = () => {
     setShowFilterAvailable(config.showFilterAvailable);
     setShowCategoryFilter(config.showCategoryFilter);
   }, [config, storeFormDirty]);
+
+  useEffect(() => {
+    if (!dialogOpen || !editingProduct) return;
+
+    const { product } = buildProductData(editingProduct.id);
+    if (!product) {
+      setAutoSaveMessage("Aguardando dados validos para salvar");
+      return;
+    }
+
+    const signature = productSignature(product);
+    if (signature === lastAutoSavedProduct.current) {
+      setAutoSaveMessage("");
+      return;
+    }
+
+    setAutoSaveMessage("Salvando alteracoes...");
+    const timeout = window.setTimeout(async () => {
+      try {
+        await setProducts(products.map(item => item.id === editingProduct.id ? product : item));
+        lastAutoSavedProduct.current = signature;
+        setAutoSaveMessage("Alteracoes salvas");
+      } catch {
+        setAutoSaveMessage("Nao foi possivel salvar no banco online");
+      }
+    }, 900);
+
+    return () => window.clearTimeout(timeout);
+  }, [dialogOpen, editingProduct, pCategoryId, pDesc, pImage, pName, pPrice, pPromo, pPromotionalPrice, pStock, products, setProducts]);
+
+  useEffect(() => {
+    if (tab !== "clients" || !supabase) return;
+
+    let isMounted = true;
+    setCustomersLoading(true);
+
+    const loadCustomers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("clientes")
+          .select("*")
+          .order("criado_em", { ascending: false });
+
+        if (error) throw error;
+        if (!isMounted) return;
+
+        setCustomers((data ?? []).map(row => ({
+          id: String(row.id),
+          nome: String(row.nome ?? ""),
+          telefone: String(row.telefone ?? ""),
+          empresa_unidade: String(row.empresa_unidade ?? ""),
+          status: String(row.status ?? "ativo") === "bloqueado" ? "bloqueado" : "ativo",
+          limite: Number(row.limite ?? 20),
+          criado_em: String(row.criado_em ?? ""),
+        })));
+      } catch (error) {
+        console.error("Erro ao carregar clientes:", error);
+        toast.error("Nao foi possivel carregar clientes.");
+      } finally {
+        if (isMounted) setCustomersLoading(false);
+      }
+    };
+
+    void loadCustomers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tab]);
 
   if (!isAdmin) {
     navigate("/admin");
@@ -176,8 +296,11 @@ const AdminDashboard = () => {
 
   const openNewProduct = () => {
     setEditingProduct(null);
+    lastAutoSavedProduct.current = "";
+    setAutoSaveMessage("");
     setPName("");
     setPPrice("");
+    setPPromotionalPrice("");
     setPDesc("");
     setPImage("");
     setPCategoryId(categories.find(category => category.isActive)?.id || "");
@@ -188,8 +311,11 @@ const AdminDashboard = () => {
 
   const openEditProduct = (p: Product) => {
     setEditingProduct(p);
+    lastAutoSavedProduct.current = productSignature(p);
+    setAutoSaveMessage("");
     setPName(p.name);
     setPPrice(String(p.price));
+    setPPromotionalPrice(p.promotionalPrice ? String(p.promotionalPrice) : "");
     setPDesc(p.description);
     setPImage(p.image);
     setPCategoryId(p.categoryId);
@@ -204,27 +330,17 @@ const AdminDashboard = () => {
   };
 
   const saveProduct = async () => {
-    const price = Number(pPrice);
+    const { product: productData, error } = buildProductData(editingProduct?.id || Date.now().toString());
 
-    if (!pName.trim() || !pPrice || Number.isNaN(price)) {
-      toast.error("Preencha nome e preco corretamente");
+    if (!productData) {
+      toast.error(error);
       return;
     }
-
-    const productData: Product = {
-      id: editingProduct?.id || Date.now().toString(),
-      name: pName.trim(),
-      price,
-      description: pDesc,
-      image: pImage,
-      categoryId: pCategoryId,
-      isPromo: pPromo,
-      stock: Math.max(0, parseInt(pStock, 10) || 0),
-    };
 
     try {
       if (editingProduct) {
         await setProducts(products.map(p => p.id === editingProduct.id ? productData : p));
+        lastAutoSavedProduct.current = productSignature(productData);
         toast.success("Produto atualizado!");
       } else {
         await setProducts([...products, productData]);
@@ -630,6 +746,11 @@ const AdminDashboard = () => {
 
         {tab === "products" && (
           <div className="space-y-4">
+            {isPromotionalPriceOnlineEnabled === false && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+                O preco promocional aparece neste navegador, mas para salvar online adicione a coluna promotional_price na tabela products do Supabase.
+              </div>
+            )}
             <Button className="gap-2" onClick={openNewProduct}><Plus className="h-4 w-4" /> Novo Produto</Button>
 
             <div className="grid gap-4">
@@ -642,9 +763,14 @@ const AdminDashboard = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-bold">{p.name}</p>
-                        {p.isPromo && <span className="rounded-full bg-promo px-2 py-0.5 text-xs text-promo-foreground">Oferta</span>}
+                        {(p.isPromo || hasPromotionalPrice(p)) && <span className="rounded-full bg-promo px-2 py-0.5 text-xs text-promo-foreground">Oferta</span>}
                       </div>
-                      <p className="text-sm font-bold text-primary">{formatPrice(p.price)}</p>
+                      <div className="text-sm">
+                        {hasPromotionalPrice(p) && (
+                          <span className="mr-2 text-muted-foreground line-through">{formatPrice(p.price)}</span>
+                        )}
+                        <span className="font-bold text-primary">{formatPrice(getProductPrice(p))}</span>
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {categories.find(category => category.id === p.categoryId)?.name || "Sem categoria"} - Estoque: {p.stock}
                       </p>
@@ -681,14 +807,30 @@ const AdminDashboard = () => {
           <div className="space-y-6">
             <h1 className="font-display text-4xl text-[#f0d8c0]">Clientes</h1>
             <div className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
-              <div className="grid grid-cols-3 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
+              <div className="grid grid-cols-5 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
                 <span>Nome</span>
                 <span>WhatsApp</span>
-                <span>Pedidos</span>
+                <span>Empresa</span>
+                <span>Status</span>
+                <span>Limite</span>
               </div>
-              <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
-                Nenhum cliente ainda
-              </div>
+              {customersLoading ? (
+                <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">Carregando clientes...</div>
+              ) : customers.length === 0 ? (
+                <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">Nenhum cliente ainda</div>
+              ) : (
+                <div className="divide-y divide-[#603000]">
+                  {customers.map(customer => (
+                    <div key={customer.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-5 md:gap-4">
+                      <span className="font-bold">{customer.nome}</span>
+                      <span>{formatPhone(customer.telefone)}</span>
+                      <span>{customer.empresa_unidade}</span>
+                      <span className={customer.status === "ativo" ? "font-bold text-green-300" : "font-bold text-red-300"}>{customer.status}</span>
+                      <span>{formatPrice(customer.limite)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -698,10 +840,14 @@ const AdminDashboard = () => {
         <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
+            {editingProduct && autoSaveMessage && (
+              <p className="text-xs font-semibold text-muted-foreground">{autoSaveMessage}</p>
+            )}
           </DialogHeader>
           <div className="space-y-4">
             <div><Label>Nome</Label><Input value={pName} onChange={e => setPName(e.target.value)} /></div>
             <div><Label>Preco (R$)</Label><Input type="number" step="0.01" value={pPrice} onChange={e => setPPrice(e.target.value)} /></div>
+            <div><Label>Preco promocional (R$)</Label><Input type="number" step="0.01" value={pPromotionalPrice} onChange={e => setPPromotionalPrice(e.target.value)} placeholder="Opcional" /></div>
             <div><Label>Descricao</Label><Textarea value={pDesc} onChange={e => setPDesc(e.target.value)} /></div>
             <div>
               <Label>Categoria</Label>
@@ -724,7 +870,7 @@ const AdminDashboard = () => {
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={pPromo} onCheckedChange={setPPromo} />
-              <Label>Marcar como promocao</Label>
+              <Label>Destacar como promocao</Label>
             </div>
           </div>
           <DialogFooter>
