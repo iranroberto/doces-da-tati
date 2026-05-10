@@ -106,10 +106,10 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
               </div>
 
               <div>
-                <Label>Empresa/Unidade</Label>
+                <Label>Loja</Label>
                 <div className="relative mt-1">
                   <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={companyUnit} onChange={event => setCompanyUnit(event.target.value)} className="pl-9" placeholder="Loja, quiosque ou setor" />
+                  <Input value={companyUnit} onChange={event => setCompanyUnit(event.target.value)} className="pl-9" placeholder="Loja" />
                 </div>
               </div>
             </>
