@@ -98,10 +98,10 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
           {mode === "register" && (
             <>
               <div>
-                <Label>Nome completo</Label>
+                <Label>Nome</Label>
                 <div className="relative mt-1">
                   <UserRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={name} onChange={event => setName(event.target.value)} className="pl-9" placeholder="Seu nome" />
+                  <Input value={name} onChange={event => setName(event.target.value)} className="pl-9" placeholder="Seu nome" required />
                 </div>
               </div>
 
@@ -109,7 +109,7 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
                 <Label>Loja</Label>
                 <div className="relative mt-1">
                   <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={companyUnit} onChange={event => setCompanyUnit(event.target.value)} className="pl-9" placeholder="Loja" />
+                  <Input value={companyUnit} onChange={event => setCompanyUnit(event.target.value)} className="pl-9" placeholder="Loja" required />
                 </div>
               </div>
             </>
@@ -125,6 +125,7 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
                 inputMode="tel"
                 className="pl-9"
                 placeholder="(21) 99999-9999"
+                required
               />
             </div>
           </div>

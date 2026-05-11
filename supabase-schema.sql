@@ -106,6 +106,15 @@ alter table public.pedidos enable row level security;
 alter table public.pagamentos enable row level security;
 alter table public.dividas enable row level security;
 
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.store_config to anon, authenticated;
+grant select, insert, update, delete on public.products to anon, authenticated;
+grant select, insert, update, delete on public.categories to anon, authenticated;
+grant select, insert, update, delete on public.clientes to anon, authenticated;
+grant select, insert, update, delete on public.pedidos to anon, authenticated;
+grant select, insert, update, delete on public.pagamentos to anon, authenticated;
+grant select, insert, update, delete on public.dividas to anon, authenticated;
+
 drop policy if exists "Public can read store config" on public.store_config;
 drop policy if exists "Public can write store config" on public.store_config;
 drop policy if exists "Public can read categories" on public.categories;

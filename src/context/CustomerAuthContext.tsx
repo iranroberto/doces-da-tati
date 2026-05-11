@@ -86,7 +86,18 @@ const findLocalCustomerByPhone = (telefone: string) =>
   loadLocalCustomers().find(customer => customer.telefone === telefone) ?? null;
 
 const findLocalCustomerBySession = (session: CustomerSession) =>
-  loadLocalCustomers().find(customer => customer.id === session.customerId && customer.telefone === session.telefone) ?? null;
+  loadLocalCustomers().find(customer => customer.id === session.customerId && customer.telefone === session.telefone)
+  ?? findLocalCustomerByPhone(session.telefone);
+
+const getCustomerSaveErrorMessage = (error: unknown) => {
+  const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+
+  if (code === "23505") return "Telefone ja cadastrado.";
+  if (code === "23502") return "Preencha nome, loja e WhatsApp.";
+  if (code === "42501") return "Sem permissao para cadastrar cliente no banco.";
+
+  return "Nao foi possivel criar a conta.";
+};
 
 export const CustomerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -111,7 +122,6 @@ export const CustomerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const { data, error } = await supabase
       .from("clientes")
       .select("*")
-      .eq("id", session.customerId)
       .eq("telefone", session.telefone)
       .maybeSingle();
 
@@ -176,12 +186,11 @@ export const CustomerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const empresaUnidade = input.empresa_unidade.trim();
 
     if (!nome || !empresaUnidade || !isValidPhone(telefone)) {
-      toast.error("Preencha nome, WhatsApp e empresa/unidade.");
+      toast.error("Preencha nome, loja e WhatsApp valido.");
       return false;
     }
 
-    const existingCustomer = await fetchCustomerByPhone(telefone);
-    if (existingCustomer) {
+    if (!supabase && findLocalCustomerByPhone(telefone)) {
       toast.error("Telefone ja cadastrado.");
       return false;
     }
@@ -197,7 +206,7 @@ export const CustomerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     if (supabase) {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("clientes")
         .insert({
           nome: nextCustomer.nome,
@@ -206,22 +215,16 @@ export const CustomerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           status: nextCustomer.status,
           limite: nextCustomer.limite,
           criado_em: nextCustomer.criado_em,
-        })
-        .select("*")
-        .single();
+        });
 
       if (error) {
-        if (error.code === "23505") {
-          toast.error("Telefone ja cadastrado.");
-          return false;
-        }
-
-        throw error;
+        console.error("Erro do Supabase ao cadastrar cliente:", error);
+        toast.error(getCustomerSaveErrorMessage(error));
+        return false;
       }
 
-      const createdCustomer = customerFromRow(data);
-      setCustomer(createdCustomer);
-      saveSession(createdCustomer);
+      setCustomer(nextCustomer);
+      saveSession(nextCustomer);
     } else {
       const customers = loadLocalCustomers();
       saveLocalCustomers([...customers, nextCustomer]);
