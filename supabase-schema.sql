@@ -60,6 +60,7 @@ create table if not exists public.pedidos (
   status_pagamento text not null default 'pendente' check (status_pagamento in ('aprovado', 'pendente', 'recusado', 'cancelado')),
   transaction_id text,
   itens jsonb not null default '[]'::jsonb,
+  estoque_baixado boolean not null default false,
   pago_em timestamptz,
   criado_em timestamptz not null default now(),
   atualizado_em timestamptz not null default now()
@@ -117,6 +118,7 @@ alter table public.pedidos
   add column if not exists status_pagamento text not null default 'pendente',
   add column if not exists transaction_id text,
   add column if not exists itens jsonb not null default '[]'::jsonb,
+  add column if not exists estoque_baixado boolean not null default false,
   add column if not exists pago_em timestamptz;
 
 alter table public.pedidos

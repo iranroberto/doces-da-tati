@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
 import { type PaymentMethod, type PaymentStatus, paymentMethodLabel, registerOrder, updateOrderPayment } from "@/lib/orders";
+import { decrementStockForPaidOrder } from "@/lib/stock";
 import { Button } from "@/components/ui/button";
 import type { CustomerInfo } from "@/types/store";
 
@@ -248,12 +249,19 @@ const Checkout = () => {
     }
 
     setIsProcessing(false);
+    if (order?.registeredOrderId) {
+      decrementStockForPaidOrder(order.registeredOrderId, order.items).catch(error => {
+        console.error("Erro ao baixar estoque:", error);
+        toast.error("Pagamento aprovado, mas nao foi possivel baixar o estoque automaticamente.");
+      });
+    }
+
     const timeout = window.setTimeout(() => {
       navigate("/meus-pedidos");
     }, 1800);
 
     return () => window.clearTimeout(timeout);
-  }, [navigate, paymentStatus]);
+  }, [navigate, order?.items, order?.registeredOrderId, paymentStatus]);
 
   const whatsappUrl = useMemo(() => {
     if (!order || !config.whatsapp) return "";

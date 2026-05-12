@@ -52,6 +52,88 @@ export const fetchSupabaseRows = async (env, path) => {
   return { data, error: null };
 };
 
+const normalizeOrderItems = (items) => {
+  if (Array.isArray(items)) return items;
+  if (typeof items === "string") {
+    try {
+      const parsed = JSON.parse(items);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+};
+
+export const decrementSupabaseStockForOrder = async (env, orderId) => {
+  const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig(env);
+  if (!supabaseUrl || !supabaseKey || !orderId) return;
+
+  const orderResponse = await fetch(`${supabaseUrl}/rest/v1/pedidos?id=eq.${encodeURIComponent(orderId)}&select=id,itens,estoque_baixado&limit=1`, {
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const orderRows = await orderResponse.json().catch(() => []);
+  if (!orderResponse.ok || !Array.isArray(orderRows) || !orderRows[0] || orderRows[0].estoque_baixado) return;
+
+  const quantitiesByProduct = new Map();
+  normalizeOrderItems(orderRows[0].itens).forEach((item) => {
+    const productId = String(item.productId || item.product_id || "");
+    const quantity = Number(item.quantity || 0);
+    if (!productId || quantity <= 0) return;
+    quantitiesByProduct.set(productId, (quantitiesByProduct.get(productId) || 0) + quantity);
+  });
+
+  if (!quantitiesByProduct.size) return;
+
+  const markResponse = await fetch(`${supabaseUrl}/rest/v1/pedidos?id=eq.${encodeURIComponent(orderId)}&estoque_baixado=is.false`, {
+    method: "PATCH",
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      estoque_baixado: true,
+      atualizado_em: new Date().toISOString(),
+    }),
+  });
+  const markedRows = await markResponse.json().catch(() => []);
+  if (!markResponse.ok || !Array.isArray(markedRows) || !markedRows.length) return;
+
+  await Promise.all(Array.from(quantitiesByProduct.entries()).map(async ([productId, quantity]) => {
+    const productResponse = await fetch(`${supabaseUrl}/rest/v1/products?id=eq.${encodeURIComponent(productId)}&select=stock&limit=1`, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    const productRows = await productResponse.json().catch(() => []);
+    if (!productResponse.ok || !Array.isArray(productRows) || !productRows[0]) return;
+
+    const nextStock = Math.max(0, Number(productRows[0].stock || 0) - quantity);
+    await fetch(`${supabaseUrl}/rest/v1/products?id=eq.${encodeURIComponent(productId)}`, {
+      method: "PATCH",
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        stock: nextStock,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  }));
+};
+
 export const getMercadoPagoCredentials = async (env) => {
   const envCredentials = {
     accessToken: env.MERCADO_PAGO_ACCESS_TOKEN || "",
@@ -107,4 +189,8 @@ export const updateSupabaseOrderPayment = async (env, { orderId, paymentMethod, 
       pago_em: paidAt || null,
     }),
   });
+
+  if (paymentStatus === "aprovado") {
+    await decrementSupabaseStockForOrder(env, orderId);
+  }
 };
