@@ -31,10 +31,15 @@ export const onRequestPost = async ({ request, env }) => {
   }
 
   const paymentStatus = mercadoPagoStatusToApp(payment.status);
+  const appPaymentMethod = payment.payment_method_id === "pix" || payment.payment_type_id === "bank_transfer"
+    ? "pix"
+    : payment.payment_type_id === "debit_card"
+      ? "debito"
+      : "credito";
 
   await updateSupabaseOrderPayment(env, {
     orderId: payment.external_reference,
-    paymentMethod: payment.payment_type_id === "debit_card" ? "debito" : "credito",
+    paymentMethod: appPaymentMethod,
     paymentStatus,
     transactionId: String(payment.id),
     paidAt: paymentStatus === "aprovado" ? payment.date_approved || new Date().toISOString() : null,

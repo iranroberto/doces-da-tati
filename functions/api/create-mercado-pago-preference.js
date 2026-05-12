@@ -1,6 +1,7 @@
 import { corsHeaders, json, updateSupabaseOrderPayment } from "../_shared.js";
 
 const allowedPaymentTypes = {
+  pix: "bank_transfer",
   credito: "credit_card",
   debito: "debit_card",
 };

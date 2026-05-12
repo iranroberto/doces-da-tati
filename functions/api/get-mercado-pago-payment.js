@@ -24,7 +24,11 @@ export const onRequestGet = async ({ request, env }) => {
   const paymentStatus = mercadoPagoStatusToApp(payment.status);
   const resolvedOrderId = orderId || payment.external_reference;
   const paidAt = paymentStatus === "aprovado" ? payment.date_approved || new Date().toISOString() : null;
-  const appPaymentMethod = payment.payment_type_id === "debit_card" ? "debito" : "credito";
+  const appPaymentMethod = payment.payment_method_id === "pix" || payment.payment_type_id === "bank_transfer"
+    ? "pix"
+    : payment.payment_type_id === "debit_card"
+      ? "debito"
+      : "credito";
 
   await updateSupabaseOrderPayment(env, {
     orderId: resolvedOrderId,

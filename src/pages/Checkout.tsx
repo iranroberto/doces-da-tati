@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Banknote, CheckCircle2, Copy, CreditCard, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
 import { type PaymentMethod, type PaymentStatus, paymentMethodLabel, registerOrder, updateOrderPayment } from "@/lib/orders";
-import { buildPixPayload } from "@/lib/pix";
 import { Button } from "@/components/ui/button";
 import type { CustomerInfo } from "@/types/store";
 
@@ -29,7 +28,7 @@ interface PendingCheckout {
 }
 
 const paymentOptions: Array<{ id: PaymentMethod; label: string; description: string; icon: typeof QrCode }> = [
-  { id: "pix", label: "PIX", description: "Copie a chave ou o Pix copia e cola", icon: QrCode },
+  { id: "pix", label: "PIX", description: "PIX com confirmacao Mercado Pago", icon: QrCode },
   { id: "dinheiro", label: "Dinheiro", description: "Pagamento combinado na entrega", icon: Banknote },
   { id: "credito", label: "Credito", description: "Cartao via Mercado Pago", icon: CreditCard },
   { id: "debito", label: "Debito", description: "Cartao via Mercado Pago", icon: CreditCard },
@@ -174,19 +173,6 @@ const Checkout = () => {
     };
   }, [order, selectedPaymentMethod]);
 
-  const pixPayload = useMemo(() => {
-    if (!order) return "";
-
-    return buildPixPayload({
-      key: config.pixKey,
-      amount: order.total,
-      receiverName: config.pixReceiverName,
-      city: config.pixCity,
-      description: "Pedido Doces da Tati",
-      txid: order.registeredOrderId?.replace(/[^a-zA-Z0-9]/g, "").slice(0, 25) || "PEDIDO",
-    });
-  }, [config.pixCity, config.pixKey, config.pixReceiverName, order]);
-
   const whatsappUrl = useMemo(() => {
     if (!order || !config.whatsapp) return "";
 
@@ -210,20 +196,6 @@ const Checkout = () => {
 
     return `https://wa.me/${config.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
   }, [config.whatsapp, order, paymentStatus, selectedPaymentMethod]);
-
-  const copyText = async (text: string, successMessage: string) => {
-    if (!text) {
-      toast.error("Informacao nao configurada.");
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(successMessage);
-    } catch {
-      toast.error("Nao foi possivel copiar.");
-    }
-  };
 
   const ensureRegisteredOrder = async (method: PaymentMethod, status: PaymentStatus) => {
     if (!order) throw new Error("Pedido nao encontrado.");
@@ -336,7 +308,7 @@ const Checkout = () => {
     );
   }
 
-  const isCardPayment = selectedPaymentMethod === "credito" || selectedPaymentMethod === "debito";
+  const isMercadoPagoPayment = selectedPaymentMethod === "pix" || selectedPaymentMethod === "credito" || selectedPaymentMethod === "debito";
 
   return (
     <main className="min-h-screen bg-background">
@@ -412,13 +384,10 @@ const Checkout = () => {
 
           {selectedPaymentMethod === "pix" && (
             <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-3">
-              <p className="text-sm font-bold">PIX copia e cola</p>
-              <p className="max-h-24 overflow-y-auto break-all rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                {pixPayload || "Pix copia e cola nao configurado."}
+              <p className="text-sm font-bold">PIX Mercado Pago</p>
+              <p className="text-sm text-muted-foreground">
+                Gere o PIX pelo Mercado Pago para o sistema confirmar automaticamente quando o pagamento for aprovado.
               </p>
-              <Button variant="outline" className="w-full gap-2" disabled={!pixPayload} onClick={() => void copyText(pixPayload, "Pix copia e cola copiado!")}>
-                <Copy className="h-4 w-4" /> Copiar Pix copia e cola
-              </Button>
             </div>
           )}
 
@@ -428,7 +397,7 @@ const Checkout = () => {
             </div>
           )}
 
-          {isCardPayment && (
+          {(selectedPaymentMethod === "credito" || selectedPaymentMethod === "debito") && (
             <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
               O pagamento sera processado em ambiente seguro do Mercado Pago.
             </div>
@@ -444,10 +413,10 @@ const Checkout = () => {
             )}
           </div>
 
-          {isCardPayment ? (
+          {isMercadoPagoPayment ? (
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void startMercadoPagoPayment()}>
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-              Pagar com Mercado Pago
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : selectedPaymentMethod === "pix" ? <QrCode className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+              {selectedPaymentMethod === "pix" ? "Gerar PIX Mercado Pago" : "Pagar com Mercado Pago"}
             </Button>
           ) : (
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void confirmManualPayment()}>
