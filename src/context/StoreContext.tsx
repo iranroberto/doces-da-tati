@@ -327,6 +327,14 @@ const configToRow = (config: StoreConfig) => ({
   pix_receiver_name: config.pixReceiverName,
   pix_city: config.pixCity,
   admin_password: config.adminPassword,
+  filter_all_label: config.filterAllLabel,
+  filter_promo_label: config.filterPromoLabel,
+  filter_available_label: config.filterAvailableLabel,
+  category_all_label: config.categoryAllLabel,
+  show_filter_all: config.showFilterAll,
+  show_filter_promo: config.showFilterPromo,
+  show_filter_available: config.showFilterAvailable,
+  show_category_filter: config.showCategoryFilter,
   updated_at: new Date().toISOString(),
 });
 

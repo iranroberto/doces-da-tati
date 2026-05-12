@@ -138,6 +138,42 @@ const Checkout = () => {
       .finally(() => setIsProcessing(false));
   }, [order?.registeredOrderId, selectedPaymentMethod]);
 
+  useEffect(() => {
+    if (!order || order.items.length === 0 || order.registeredOrderId) return;
+
+    let isMounted = true;
+    const method = (order.paymentMethod || selectedPaymentMethod || "pix") as PaymentMethod;
+    const status = order.paymentStatus || "pendente";
+
+    registerOrder({
+      ...order,
+      paymentMethod: method,
+      paymentStatus: status,
+    })
+      .then(registeredOrderId => {
+        if (!isMounted) return;
+
+        const nextOrder = {
+          ...order,
+          paymentMethod: method,
+          paymentStatus: status,
+          registeredOrderId,
+        };
+        setOrder(nextOrder);
+        setSelectedPaymentMethod(method);
+        setPaymentStatus(status);
+        savePendingCheckout(nextOrder);
+      })
+      .catch(error => {
+        console.error("Erro ao registrar pedido automaticamente:", error);
+        toast.error("Nao foi possivel registrar o pedido no painel.");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [order, selectedPaymentMethod]);
+
   const pixPayload = useMemo(() => {
     if (!order) return "";
 
@@ -204,6 +240,30 @@ const Checkout = () => {
     savePendingCheckout(savedOrder);
 
     return savedOrder;
+  };
+
+  const handlePaymentMethodChange = (method: PaymentMethod) => {
+    setSelectedPaymentMethod(method);
+
+    if (!order) return;
+
+    const nextOrder = {
+      ...order,
+      paymentMethod: method,
+      paymentStatus,
+    };
+    setOrder(nextOrder);
+    savePendingCheckout(nextOrder);
+
+    if (!order.registeredOrderId) return;
+
+    updateOrderPayment(order.registeredOrderId, {
+      paymentMethod: method,
+      paymentStatus,
+    }).catch(error => {
+      console.error("Erro ao atualizar forma de pagamento:", error);
+      toast.error("Nao foi possivel atualizar o pagamento do pedido.");
+    });
   };
 
   const confirmManualPayment = async () => {
@@ -339,7 +399,7 @@ const Checkout = () => {
                     className={active
                       ? "rounded-lg border-2 border-primary bg-primary/10 p-3 text-left text-primary"
                       : "rounded-lg border border-border bg-background p-3 text-left text-foreground"}
-                    onClick={() => setSelectedPaymentMethod(option.id)}
+                    onClick={() => handlePaymentMethodChange(option.id)}
                   >
                     <Icon className="mb-2 h-5 w-5" />
                     <span className="block text-sm font-bold">{option.label}</span>
