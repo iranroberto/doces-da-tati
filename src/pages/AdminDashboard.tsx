@@ -28,6 +28,8 @@ const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
 const LOCAL_CUSTOMERS_KEY = "store_customers";
+const BANNER_RECOMMENDED_WIDTH = 1600;
+const BANNER_RECOMMENDED_HEIGHT = 340;
 
 const readApiJson = async (response: Response) => {
   const text = await response.text();
@@ -1065,24 +1067,31 @@ const AdminDashboard = () => {
               <CardContent className="space-y-4">
                 <div>
                   <Label>Imagem do banner</Label>
+                  <p className="mb-2 mt-1 text-xs font-semibold text-muted-foreground">
+                    Tamanho recomendado: {BANNER_RECOMMENDED_WIDTH} x {BANNER_RECOMMENDED_HEIGHT}px. Deixe o conteudo principal centralizado para nao cortar no celular.
+                  </p>
                   <Input type="file" accept="image/*" onChange={handleBannerUpload} />
                 </div>
 
                 {bannerImage && (
                   <>
-                    <div className="overflow-hidden rounded-lg border bg-muted">
+                    <div
+                      className="overflow-hidden rounded-lg border bg-muted"
+                      style={{ aspectRatio: `${BANNER_RECOMMENDED_WIDTH} / ${BANNER_RECOMMENDED_HEIGHT}` }}
+                    >
                       <img
                         src={bannerImage}
                         alt="Preview do banner"
-                        className="w-full object-cover"
-                        style={{ height: `${bannerHeight}px`, objectPosition: `${bannerPositionX}% ${bannerPositionY}%` }}
+                        className="h-full w-full object-cover"
+                        style={{ objectPosition: `${bannerPositionX}% ${bannerPositionY}%` }}
                       />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs font-semibold text-muted-foreground">
+                    <div className="grid grid-cols-2 gap-2 text-center text-xs font-semibold text-muted-foreground md:grid-cols-4">
+                      <span>Arte: {BANNER_RECOMMENDED_WIDTH} x {BANNER_RECOMMENDED_HEIGHT}px</span>
                       <span>Horizontal: {bannerPositionX}%</span>
                       <span>Vertical: {bannerPositionY}%</span>
-                      <span>Altura: {bannerHeight}px</span>
+                      <span>Altura no site: {bannerHeight}px</span>
                     </div>
 
                     <div className="flex items-center gap-2">
