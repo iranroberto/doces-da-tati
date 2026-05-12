@@ -3,7 +3,7 @@ import { ArrowLeft, CheckCircle2, Clock, Package, ReceiptText, Star, Truck } fro
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
-import { loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
+import { loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, updateOrderPayment, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
 import { getLocalRating, saveProductRating } from "@/lib/ratings";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ interface CustomerOrder {
   status: string;
   paymentMethod: string;
   paymentStatus: PaymentStatus;
+  transactionId: string;
+  paidAt: string;
   items: OrderItemDraft[];
 }
 
@@ -42,11 +44,37 @@ const mapOrderRows = (rows: Record<string, unknown>[]): CustomerOrder[] =>
     status: String(row.status ?? "aberto"),
     paymentMethod: String(row.forma_pagamento ?? "pix"),
     paymentStatus: normalizePaymentStatus(row.status_pagamento),
+    transactionId: String(row.transaction_id ?? ""),
+    paidAt: String(row.pago_em ?? ""),
     items: parseOrderItems(row.itens),
   }));
 
-const localOrdersForCustomer = (customerId: string, telefone: string): CustomerOrder[] =>
-  loadLocalOrders()
+const loadPendingCheckoutOrder = (customerId: string, telefone: string): CustomerOrder | null => {
+  try {
+    const value = JSON.parse(localStorage.getItem("pending_checkout") || "null");
+    const customer = value?.customer;
+    const orderId = String(value?.registeredOrderId ?? "");
+    if (!orderId || !Array.isArray(value?.items)) return null;
+    if (String(customer?.id ?? "") !== customerId && String(customer?.whatsapp ?? "") !== telefone) return null;
+
+    return {
+      id: orderId,
+      createdAt: String(value.createdAt ?? ""),
+      total: Number(value.total ?? 0),
+      status: "aberto",
+      paymentMethod: String(value.paymentMethod ?? "pix"),
+      paymentStatus: normalizePaymentStatus(value.paymentStatus),
+      transactionId: String(value.transactionId ?? ""),
+      paidAt: String(value.paidAt ?? ""),
+      items: parseOrderItems(value.items),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const localOrdersForCustomer = (customerId: string, telefone: string): CustomerOrder[] => {
+  const localOrders = loadLocalOrders()
     .filter(order => order.customerId === customerId || order.customerWhatsapp === telefone)
     .map(order => ({
       id: order.id,
@@ -55,8 +83,15 @@ const localOrdersForCustomer = (customerId: string, telefone: string): CustomerO
       status: order.status,
       paymentMethod: order.paymentMethod,
       paymentStatus: order.paymentStatus,
+      transactionId: order.transactionId,
+      paidAt: order.paidAt,
       items: order.items,
     }));
+  const pendingCheckoutOrder = loadPendingCheckoutOrder(customerId, telefone);
+
+  if (!pendingCheckoutOrder || localOrders.some(order => order.id === pendingCheckoutOrder.id)) return localOrders;
+  return [pendingCheckoutOrder, ...localOrders];
+};
 
 const mergeOrders = (remoteOrders: CustomerOrder[], localOrders: CustomerOrder[]) => {
   const ordersById = new Map<string, CustomerOrder>();
@@ -69,6 +104,9 @@ const mergeOrders = (remoteOrders: CustomerOrder[], localOrders: CustomerOrder[]
     const localOrder = ordersById.get(order.id);
     ordersById.set(order.id, {
       ...order,
+      paymentStatus: localOrder?.paymentStatus === "aprovado" ? "aprovado" : order.paymentStatus,
+      transactionId: order.transactionId || localOrder?.transactionId || "",
+      paidAt: order.paidAt || localOrder?.paidAt || "",
       items: order.items.length ? order.items : localOrder?.items ?? [],
     });
   });
@@ -106,7 +144,7 @@ const MyOrders = () => {
 
       const result = await supabase
         .from("pedidos")
-        .select("id, criado_em, status, total, forma_pagamento, status_pagamento, itens")
+        .select("id, criado_em, status, total, forma_pagamento, status_pagamento, transaction_id, pago_em, itens")
         .eq("cliente_id", customer.id)
         .order("criado_em", { ascending: false });
 
@@ -115,7 +153,7 @@ const MyOrders = () => {
         if (code === "42703" || code === "PGRST204") {
           const legacyResult = await supabase
             .from("pedidos")
-            .select("id, criado_em, status, total, forma_pagamento, status_pagamento")
+            .select("id, criado_em, status, total, forma_pagamento, status_pagamento, transaction_id, pago_em")
             .eq("cliente_id", customer.id)
             .order("criado_em", { ascending: false });
 
@@ -134,6 +172,18 @@ const MyOrders = () => {
         if (!isMounted) return;
 
         setOrders(nextOrders);
+        nextOrders
+          .filter(order => order.paymentStatus === "aprovado" && order.id && order.transactionId)
+          .forEach(order => {
+            updateOrderPayment(order.id, {
+              paymentMethod: order.paymentMethod,
+              paymentStatus: "aprovado",
+              transactionId: order.transactionId,
+              paidAt: order.paidAt,
+            }).catch(error => {
+              console.error("Erro ao sincronizar pagamento aprovado:", error);
+            });
+          });
         const nextRatings: Record<string, number> = {};
         nextOrders.forEach(order => {
           order.items.forEach(item => {
