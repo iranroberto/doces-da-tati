@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { BarChart3, CheckCircle2, ClipboardList, DollarSign, Image, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, Users } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BarChart3, CheckCircle2, ClipboardList, DollarSign, Image, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, Truck, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
-import { loadLocalOrders, normalizePaymentStatus, paymentMethodLabel, type PaymentStatus } from "@/lib/orders";
+import { loadLocalOrders, normalizePaymentStatus, paymentMethodLabel, updateOrderStatus, type PaymentStatus } from "@/lib/orders";
 import { getProductPrice, hasPromotionalPrice } from "@/lib/pricing";
 import { formatPhone } from "@/lib/phone";
 import { supabase } from "@/lib/supabase";
@@ -52,6 +52,12 @@ interface AdminOrder {
   paymentMethod: string;
   paymentStatus: PaymentStatus;
   transactionId: string;
+}
+
+interface CustomerOrderGroup {
+  customerName: string;
+  total: number;
+  orders: AdminOrder[];
 }
 
 const loadLocalCustomers = (): Customer[] => {
@@ -181,6 +187,7 @@ const AdminDashboard = () => {
   const [deletingCustomerId, setDeletingCustomerId] = useState("");
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [updatingOrderStatusId, setUpdatingOrderStatusId] = useState("");
 
   const buildProductData = (productId: string): { product?: Product; error?: string } => {
     const price = Number(pPrice);
@@ -411,6 +418,24 @@ const AdminDashboard = () => {
       isMounted = false;
     };
   }, [tab]);
+
+  const orderGroups = useMemo<CustomerOrderGroup[]>(() => {
+    const groups = new Map<string, CustomerOrderGroup>();
+
+    orders.forEach(order => {
+      const customerName = order.customerName || "Cliente";
+      const current = groups.get(customerName) || { customerName, total: 0, orders: [] };
+      current.total += order.total;
+      current.orders.push(order);
+      groups.set(customerName, current);
+    });
+
+    return Array.from(groups.values()).sort((a, b) => {
+      const latestA = new Date(a.orders[0]?.createdAt || 0).getTime();
+      const latestB = new Date(b.orders[0]?.createdAt || 0).getTime();
+      return latestB - latestA;
+    });
+  }, [orders]);
 
   if (!isAdmin) {
     navigate("/admin");
@@ -675,6 +700,24 @@ const AdminDashboard = () => {
       toast.error("Nao foi possivel excluir o cliente.");
     } finally {
       setDeletingCustomerId("");
+    }
+  };
+
+  const toggleOrderDeliveryStatus = async (order: AdminOrder) => {
+    const nextStatus = order.status === "entregue" ? "aberto" : "entregue";
+    setUpdatingOrderStatusId(order.id);
+
+    try {
+      await updateOrderStatus(order.id, nextStatus);
+      setOrders(current => current.map(item => (
+        item.id === order.id ? { ...item, status: nextStatus } : item
+      )));
+      toast.success(nextStatus === "entregue" ? "Pedido marcado como entregue." : "Pedido marcado como pendente.");
+    } catch (error) {
+      console.error("Erro ao atualizar status do pedido:", error);
+      toast.error("Nao foi possivel atualizar o pedido.");
+    } finally {
+      setUpdatingOrderStatusId("");
     }
   };
 
@@ -1108,40 +1151,90 @@ const AdminDashboard = () => {
 
         {tab === "orders" && (
           <div className="space-y-6">
-            <h1 className="font-display text-4xl text-[#f0d8c0]">Pedidos</h1>
-            <div className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
-              <div className="grid grid-cols-6 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
-                <span>Pedido</span>
-                <span>Cliente</span>
-                <span>Total</span>
-                <span>Pagamento</span>
-                <span>Status pag.</span>
-                <span>Status</span>
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h1 className="font-display text-4xl text-[#f0d8c0]">Pedidos</h1>
+                <p className="text-sm font-semibold text-[#d8c0a8]">Pedidos organizados por cliente, valor, data e entrega.</p>
               </div>
-              {ordersLoading ? (
-                <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">Carregando pedidos...</div>
-              ) : orders.length === 0 ? (
-                <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
-                  Nenhum pedido ainda
-                </div>
-              ) : (
-                <div className="divide-y divide-[#603000]">
-                  {orders.map(order => (
-                    <div key={order.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-6 md:gap-4">
-                      <span className="font-bold">{formatDateTime(order.createdAt)}</span>
-                      <span>{order.customerName}</span>
-                      <span className="font-bold text-[#f0d8a8]">{formatPrice(order.total)}</span>
-                      <span>{paymentMethodLabel(order.paymentMethod)}</span>
-                      <span className={order.paymentStatus === "aprovado" ? "font-bold text-green-300" : order.paymentStatus === "recusado" ? "font-bold text-red-300" : "font-bold text-yellow-200"}>
-                        {order.paymentStatus}
-                        {order.transactionId && <span className="block break-all text-xs font-normal text-[#d8c0a8]">{order.transactionId}</span>}
-                      </span>
-                      <span className="font-bold text-green-300">{order.status}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{orders.length} pedido(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-green-300">{orders.filter(order => order.status === "entregue").length} entregue(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{orders.filter(order => order.status !== "entregue").length} pendente(s)</span>
+              </div>
             </div>
+
+            {ordersLoading ? (
+              <div className="rounded-[18px] border border-[#603000] bg-[#481800] px-5 py-10 text-center text-sm text-[#d8c0a8]">
+                Carregando pedidos...
+              </div>
+            ) : orderGroups.length === 0 ? (
+              <div className="rounded-[18px] border border-[#603000] bg-[#481800] px-5 py-10 text-center text-sm text-[#d8c0a8]">
+                Nenhum pedido ainda
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {orderGroups.map(group => (
+                  <section key={group.customerName} className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
+                    <div className="flex flex-col gap-2 border-b border-[#603000] px-5 py-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h2 className="font-display text-2xl text-[#f0d8a8]">{group.customerName}</h2>
+                        <p className="text-sm font-semibold text-[#d8c0a8]">
+                          {group.orders.length} pedido(s) - Total {formatPrice(group.total)}
+                        </p>
+                      </div>
+                      <span className="w-fit rounded-full bg-[#f0d8c0] px-3 py-1 text-sm font-bold text-[#481800]">
+                        {group.orders.filter(order => order.status === "entregue").length}/{group.orders.length} entregue(s)
+                      </span>
+                    </div>
+
+                    <div className="divide-y divide-[#603000]">
+                      {group.orders.map(order => {
+                        const delivered = order.status === "entregue";
+
+                        return (
+                          <article key={order.id} className="grid grid-cols-1 gap-3 px-5 py-4 text-sm text-[#f0d8c0] lg:grid-cols-[1.2fr_1fr_1fr_1.3fr_auto] lg:items-center">
+                            <div>
+                              <p className="text-xs font-bold uppercase text-[#d8c0a8]">Data</p>
+                              <p className="font-bold">{formatDateTime(order.createdAt)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold uppercase text-[#d8c0a8]">Valor</p>
+                              <p className="font-bold text-[#f0d8a8]">{formatPrice(order.total)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold uppercase text-[#d8c0a8]">Pagamento</p>
+                              <p>{paymentMethodLabel(order.paymentMethod)}</p>
+                              <p className={order.paymentStatus === "aprovado" ? "font-bold text-green-300" : order.paymentStatus === "recusado" ? "font-bold text-red-300" : "font-bold text-yellow-200"}>
+                                {order.paymentStatus}
+                              </p>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold uppercase text-[#d8c0a8]">Pedido</p>
+                              <p className={delivered ? "font-bold text-green-300" : "font-bold text-yellow-200"}>
+                                {delivered ? "Entregue" : "Pendente de entrega"}
+                              </p>
+                              {order.transactionId && <p className="break-all text-xs text-[#d8c0a8]">Transacao: {order.transactionId}</p>}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className={delivered
+                                ? "w-full gap-2 border-yellow-300 bg-transparent text-yellow-100 hover:bg-yellow-950/40 hover:text-yellow-50 lg:w-fit"
+                                : "w-full gap-2 border-green-300 bg-transparent text-green-100 hover:bg-green-950/40 hover:text-green-50 lg:w-fit"}
+                              disabled={updatingOrderStatusId === order.id}
+                              onClick={() => void toggleOrderDeliveryStatus(order)}
+                            >
+                              {delivered ? <ClipboardList className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
+                              {delivered ? "Marcar pendente" : "Marcar entregue"}
+                            </Button>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

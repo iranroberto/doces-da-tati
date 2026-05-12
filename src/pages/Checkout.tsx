@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Banknote, CheckCircle2, Copy, CreditCard, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
+import { ArrowLeft, Banknote, CheckCircle2, Copy, CreditCard, Heart, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
@@ -117,6 +117,7 @@ const Checkout = () => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pendente");
   const [isProcessing, setIsProcessing] = useState(false);
   const [pixPayment, setPixPayment] = useState<PixPayment | null>(null);
+  const [thankYouToastShown, setThankYouToastShown] = useState(false);
 
   useEffect(() => {
     const savedOrder = loadPendingCheckout();
@@ -232,6 +233,13 @@ const Checkout = () => {
 
     return () => window.clearInterval(interval);
   }, [checkPixPayment, order?.registeredOrderId, paymentStatus, pixPayment?.paymentId, selectedPaymentMethod]);
+
+  useEffect(() => {
+    if (paymentStatus !== "aprovado" || thankYouToastShown) return;
+
+    toast.success("Pagamento confirmado. Obrigado pelo pedido!");
+    setThankYouToastShown(true);
+  }, [paymentStatus, thankYouToastShown]);
 
   useEffect(() => {
     if (!order || order.items.length === 0 || order.registeredOrderId) return;
@@ -520,6 +528,22 @@ const Checkout = () => {
             <span>Total</span>
             <span className="text-primary">{formatPrice(order.total)}</span>
           </div>
+
+          {paymentStatus === "aprovado" && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-900">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
+                  <Heart className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-display text-lg font-bold">Obrigado pelo pedido!</p>
+                  <p className="mt-1 text-sm">
+                    Pagamento confirmado. Recebemos seu pedido e vamos preparar tudo com carinho.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <p className="mb-2 text-sm font-bold">Forma de pagamento</p>

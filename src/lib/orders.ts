@@ -217,3 +217,22 @@ export const updateOrderPayment = async (
     };
   })));
 };
+
+export const updateOrderStatus = async (orderId: string, status: string) => {
+  if (supabase && isUuid(orderId)) {
+    const { error } = await supabase
+      .from("pedidos")
+      .update({
+        status,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (error && !isMissingOrdersTableError(error)) throw error;
+  }
+
+  const orders = loadLocalOrders();
+  localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(orders.map(order => (
+    order.id === orderId ? { ...order, status } : order
+  ))));
+};
