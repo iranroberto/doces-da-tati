@@ -433,8 +433,24 @@ const AdminDashboard = () => {
 
     void loadOrders();
 
+    const refreshOrders = () => {
+      void loadOrders();
+    };
+    const interval = window.setInterval(refreshOrders, 5000);
+    window.addEventListener("focus", refreshOrders);
+
+    const channel = supabase
+      ? supabase
+          .channel(`admin-orders-${tab}`)
+          .on("postgres_changes", { event: "*", schema: "public", table: "pedidos" }, refreshOrders)
+          .subscribe()
+      : null;
+
     return () => {
       isMounted = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshOrders);
+      if (channel) void supabase?.removeChannel(channel);
     };
   }, [tab]);
 
