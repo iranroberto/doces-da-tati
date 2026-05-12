@@ -437,7 +437,9 @@ const AdminDashboard = () => {
   const orderGroups = useMemo<CustomerOrderGroup[]>(() => {
     const groups = new Map<string, CustomerOrderGroup>();
 
-    orders.forEach(order => {
+    const paidOrders = orders.filter(order => order.paymentStatus === "aprovado");
+
+    paidOrders.forEach(order => {
       const customerName = order.customerName || "Cliente";
       const current = groups.get(customerName) || { customerName, total: 0, orders: [] };
       current.total += order.total;
@@ -456,7 +458,8 @@ const AdminDashboard = () => {
     const today = new Date();
     return orders.filter(order => {
       const createdAt = new Date(order.createdAt);
-      return !Number.isNaN(createdAt.getTime())
+      return order.paymentStatus === "aprovado"
+        && !Number.isNaN(createdAt.getTime())
         && createdAt.getFullYear() === today.getFullYear()
         && createdAt.getMonth() === today.getMonth()
         && createdAt.getDate() === today.getDate();
@@ -469,7 +472,8 @@ const AdminDashboard = () => {
       .reduce((sum, order) => sum + order.total, 0)
   ), [orders]);
 
-  const recentOrders = orders.slice(0, 5);
+  const paidOrders = orders.filter(order => order.paymentStatus === "aprovado");
+  const recentOrders = paidOrders.slice(0, 5);
 
   if (!isAdmin) {
     navigate("/admin");
@@ -1224,9 +1228,9 @@ const AdminDashboard = () => {
                 <p className="text-sm font-semibold text-[#d8c0a8]">Pedidos organizados por cliente, valor, data e entrega.</p>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{orders.length} pedido(s)</span>
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-green-300">{orders.filter(order => order.status === "entregue").length} entregue(s)</span>
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{orders.filter(order => order.status !== "entregue").length} pendente(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{paidOrders.length} pedido(s) pago(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-green-300">{paidOrders.filter(order => order.status === "entregue").length} entregue(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{paidOrders.filter(order => order.status !== "entregue").length} pendente(s)</span>
               </div>
             </div>
 

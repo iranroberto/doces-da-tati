@@ -195,6 +195,12 @@ const Checkout = () => {
       }
 
       const nextStatus = (result.status || "pendente") as PaymentStatus;
+      await updateOrderPayment(orderId, {
+        paymentMethod: "pix",
+        paymentStatus: nextStatus,
+        transactionId: result.paymentId || paymentId,
+        paidAt: result.paidAt,
+      });
       setPaymentStatus(nextStatus);
       setOrder(current => {
         if (!current) return current;
@@ -248,42 +254,6 @@ const Checkout = () => {
 
     return () => window.clearTimeout(timeout);
   }, [navigate, paymentStatus]);
-
-  useEffect(() => {
-    if (!order || order.items.length === 0 || order.registeredOrderId) return;
-
-    let isMounted = true;
-    const method = (order.paymentMethod || selectedPaymentMethod || "pix") as PaymentMethod;
-    const status = order.paymentStatus || "pendente";
-
-    registerOrder({
-      ...order,
-      paymentMethod: method,
-      paymentStatus: status,
-    })
-      .then(registeredOrderId => {
-        if (!isMounted) return;
-
-        const nextOrder = {
-          ...order,
-          paymentMethod: method,
-          paymentStatus: status,
-          registeredOrderId,
-        };
-        setOrder(nextOrder);
-        setSelectedPaymentMethod(method);
-        setPaymentStatus(status);
-        savePendingCheckout(nextOrder);
-      })
-      .catch(error => {
-        console.error("Erro ao registrar pedido automaticamente:", error);
-        toast.error("Nao foi possivel registrar o pedido no painel.");
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [order, selectedPaymentMethod]);
 
   const whatsappUrl = useMemo(() => {
     if (!order || !config.whatsapp) return "";
