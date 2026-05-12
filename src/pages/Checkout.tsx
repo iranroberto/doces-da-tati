@@ -412,16 +412,13 @@ const Checkout = () => {
 
           {selectedPaymentMethod === "pix" && (
             <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-3">
-              <p className="text-sm font-bold">PIX</p>
-              <p className="break-all text-xs text-muted-foreground">{config.pixKey || "Chave Pix nao configurada"}</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button variant="outline" className="gap-2" disabled={!config.pixKey} onClick={() => void copyText(config.pixKey, "Chave Pix copiada!")}>
-                  <Copy className="h-4 w-4" /> Chave
-                </Button>
-                <Button variant="outline" className="gap-2" disabled={!pixPayload} onClick={() => void copyText(pixPayload, "Pix copia e cola copiado!")}>
-                  <Copy className="h-4 w-4" /> Copia e cola
-                </Button>
-              </div>
+              <p className="text-sm font-bold">PIX copia e cola</p>
+              <p className="max-h-24 overflow-y-auto break-all rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                {pixPayload || "Pix copia e cola nao configurado."}
+              </p>
+              <Button variant="outline" className="w-full gap-2" disabled={!pixPayload} onClick={() => void copyText(pixPayload, "Pix copia e cola copiado!")}>
+                <Copy className="h-4 w-4" /> Copiar Pix copia e cola
+              </Button>
             </div>
           )}
 
