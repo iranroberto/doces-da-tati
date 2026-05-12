@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { CakeSlice, LogOut, ShoppingCart, UserRound } from "lucide-react";
+import { CakeSlice, LogOut, ReceiptText, ShoppingCart, UserRound } from "lucide-react";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useStore } from "@/context/StoreContext";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,12 @@ const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
                   <LogOut className="h-4 w-4" />
                 </button>
               </div>
+              <Button variant="ghost" className="gap-2 px-2 text-primary-foreground hover:bg-primary-foreground/20" asChild>
+                <Link to="/meus-pedidos">
+                  <ReceiptText className="h-5 w-5" />
+                  <span className="hidden md:inline">Meus pedidos</span>
+                </Link>
+              </Button>
               <Button variant="ghost" className="max-w-36 gap-2 px-2 text-primary-foreground hover:bg-primary-foreground/20 sm:hidden" onClick={logoutCustomer} aria-label="Sair da conta">
                 <UserRound className="h-5 w-5" />
                 <span className="min-w-0 truncate text-xs font-bold">{customerName.split(" ")[0] || customerName}</span>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Banknote, CheckCircle2, Copy, CreditCard, Heart, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
 import { type PaymentMethod, type PaymentStatus, paymentMethodLabel, registerOrder, updateOrderPayment } from "@/lib/orders";
@@ -112,6 +112,7 @@ const getMercadoPagoReturnParams = () => {
 
 const Checkout = () => {
   const { config } = useStore();
+  const navigate = useNavigate();
   const [order, setOrder] = useState<PendingCheckout | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("pix");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pendente");
@@ -239,7 +240,12 @@ const Checkout = () => {
 
     toast.success("Pagamento confirmado. Obrigado pelo pedido!");
     setThankYouToastShown(true);
-  }, [paymentStatus, thankYouToastShown]);
+    const timeout = window.setTimeout(() => {
+      navigate("/meus-pedidos");
+    }, 2800);
+
+    return () => window.clearTimeout(timeout);
+  }, [navigate, paymentStatus, thankYouToastShown]);
 
   useEffect(() => {
     if (!order || order.items.length === 0 || order.registeredOrderId) return;
@@ -540,6 +546,9 @@ const Checkout = () => {
                   <p className="mt-1 text-sm">
                     Pagamento confirmado. Recebemos seu pedido e vamos preparar tudo com carinho.
                   </p>
+                  <Button className="mt-3 h-9 gap-2 bg-green-700 text-white hover:bg-green-800" asChild>
+                    <Link to="/meus-pedidos"><Package className="h-4 w-4" /> Ver meus pedidos</Link>
+                  </Button>
                 </div>
               </div>
             </div>
