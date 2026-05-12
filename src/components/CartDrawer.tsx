@@ -1,4 +1,4 @@
-import { MessageCircle, Minus, Package, Plus, Trash2, UserRound } from "lucide-react";
+import { CreditCard, MessageCircle, Minus, Package, Plus, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useStore } from "@/context/StoreContext";
@@ -35,7 +35,6 @@ const CartDrawer = ({ open, onClose, onCustomerAuthOpen }: CartDrawerProps) => {
         whatsapp: customer.telefone,
         companyUnit: customer.empresa_unidade,
         status: customer.status,
-        limit: customer.limite,
       },
       items: cart.map(item => ({
         productId: item.product.id,
@@ -45,6 +44,8 @@ const CartDrawer = ({ open, onClose, onCustomerAuthOpen }: CartDrawerProps) => {
         image: item.product.image,
       })),
       total: cartTotal,
+      paymentMethod: "",
+      paymentStatus: "pendente",
     };
 
     localStorage.setItem("pending_checkout", JSON.stringify(order));
@@ -112,9 +113,12 @@ const CartDrawer = ({ open, onClose, onCustomerAuthOpen }: CartDrawerProps) => {
                   <p className="font-bold">{customer.nome}</p>
                   <p className="text-muted-foreground">{formatPhone(customer.telefone)}</p>
                   <p className="text-muted-foreground">{customer.empresa_unidade}</p>
-                  <div className="mt-2 flex items-center justify-between rounded-md bg-background px-3 py-2">
-                    <span className="text-xs font-semibold uppercase text-muted-foreground">Limite fiado</span>
-                    <span className="font-bold text-primary">{formatPrice(customer.limite)}</span>
+                  <div className="mt-2 flex items-center justify-between gap-3 rounded-md bg-background px-3 py-2">
+                    <span className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                      <CreditCard className="h-4 w-4" />
+                      Pagamento
+                    </span>
+                    <span className="text-right text-sm font-bold text-primary">Escolha no checkout</span>
                   </div>
                 </div>
               ) : (

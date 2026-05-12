@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
+import { loadLocalOrders, normalizePaymentStatus, paymentMethodLabel, type PaymentStatus } from "@/lib/orders";
 import { getProductPrice, hasPromotionalPrice } from "@/lib/pricing";
 import { formatPhone } from "@/lib/phone";
 import { supabase } from "@/lib/supabase";
@@ -25,6 +26,68 @@ const fileToBase64 = (file: File): Promise<string> =>
 
 const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+const LOCAL_CUSTOMERS_KEY = "store_customers";
+
+interface AdminOrder {
+  id: string;
+  createdAt: string;
+  customerName: string;
+  total: number;
+  status: string;
+  paymentMethod: string;
+  paymentStatus: PaymentStatus;
+  transactionId: string;
+}
+
+const loadLocalCustomers = (): Customer[] => {
+  try {
+    const raw = localStorage.getItem(LOCAL_CUSTOMERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveLocalCustomers = (customers: Customer[]) => {
+  localStorage.setItem(LOCAL_CUSTOMERS_KEY, JSON.stringify(customers));
+};
+
+const customerFromRow = (row: Record<string, unknown>): Customer => ({
+  id: String(row.id),
+  nome: String(row.nome ?? ""),
+  telefone: String(row.telefone ?? ""),
+  empresa_unidade: String(row.empresa_unidade ?? ""),
+  status: String(row.status ?? "ativo") === "bloqueado" ? "bloqueado" : "ativo",
+  criado_em: String(row.criado_em ?? ""),
+});
+
+const isMissingCustomersTableError = (error: unknown) => {
+  const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+  return code === "PGRST205" || code === "42P01";
+};
+
+const isMissingOrdersTableError = (error: unknown) => {
+  const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+  return code === "PGRST205" || code === "42P01";
+};
+
+const isMissingPaymentColumnsError = (error: unknown) => {
+  const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+  return code === "42703" || code === "PGRST204";
+};
+
+const formatDateTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+};
 
 const productSignature = (product: Product) => JSON.stringify({
   id: product.id,
@@ -91,6 +154,9 @@ const AdminDashboard = () => {
   const [autoSaveMessage, setAutoSaveMessage] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
+  const [deletingCustomerId, setDeletingCustomerId] = useState("");
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   const buildProductData = (productId: string): { product?: Product; error?: string } => {
     const price = Number(pPrice);
@@ -178,30 +244,32 @@ const AdminDashboard = () => {
   }, [dialogOpen, editingProduct, pCategoryId, pDesc, pImage, pName, pPrice, pPromo, pPromotionalPrice, pStock, products, setProducts]);
 
   useEffect(() => {
-    if (tab !== "clients" || !supabase) return;
+    if (tab !== "clients") return;
 
     let isMounted = true;
     setCustomersLoading(true);
 
     const loadCustomers = async () => {
       try {
+        if (!supabase) {
+          setCustomers(loadLocalCustomers());
+          return;
+        }
+
         const { data, error } = await supabase
           .from("clientes")
           .select("*")
           .order("criado_em", { ascending: false });
 
+        if (isMissingCustomersTableError(error)) {
+          setCustomers(loadLocalCustomers());
+          return;
+        }
+
         if (error) throw error;
         if (!isMounted) return;
 
-        setCustomers((data ?? []).map(row => ({
-          id: String(row.id),
-          nome: String(row.nome ?? ""),
-          telefone: String(row.telefone ?? ""),
-          empresa_unidade: String(row.empresa_unidade ?? ""),
-          status: String(row.status ?? "ativo") === "bloqueado" ? "bloqueado" : "ativo",
-          limite: Number(row.limite ?? 20),
-          criado_em: String(row.criado_em ?? ""),
-        })));
+        setCustomers((data ?? []).map(customerFromRow));
       } catch (error) {
         console.error("Erro ao carregar clientes:", error);
         toast.error("Nao foi possivel carregar clientes.");
@@ -211,6 +279,80 @@ const AdminDashboard = () => {
     };
 
     void loadCustomers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab !== "orders") return;
+
+    let isMounted = true;
+    setOrdersLoading(true);
+
+    const loadOrders = async () => {
+      try {
+        if (!supabase) {
+          setOrders(loadLocalOrders());
+          return;
+        }
+
+        const result = await supabase
+          .from("pedidos")
+          .select("id, criado_em, status, total, forma_pagamento, status_pagamento, transaction_id, clientes(nome)")
+          .order("criado_em", { ascending: false });
+
+        let data = result.data;
+        let error = result.error;
+
+        if (isMissingPaymentColumnsError(error)) {
+          const legacyResult = await supabase
+            .from("pedidos")
+            .select("id, criado_em, status, total, clientes(nome)")
+            .order("criado_em", { ascending: false });
+          data = legacyResult.data;
+          error = legacyResult.error;
+        }
+
+        if (isMissingOrdersTableError(error)) {
+          setOrders(loadLocalOrders());
+          return;
+        }
+
+        if (error) throw error;
+        if (!isMounted) return;
+
+        const localOrdersById = new Map(loadLocalOrders().map(order => [order.id, order]));
+
+        setOrders((data ?? []).map(row => {
+          const id = String(row.id);
+          const localOrder = localOrdersById.get(id);
+          const customer = row.clientes;
+          const customerName = Array.isArray(customer)
+            ? String(customer[0]?.nome ?? "")
+            : String(customer?.nome ?? "");
+
+          return {
+            id,
+            createdAt: String(row.criado_em ?? ""),
+            customerName: customerName || localOrder?.customerName || "Cliente",
+            total: Number(row.total ?? 0),
+            status: String(row.status ?? "aberto"),
+            paymentMethod: String(row.forma_pagamento ?? localOrder?.paymentMethod ?? "pix"),
+            paymentStatus: normalizePaymentStatus(row.status_pagamento ?? localOrder?.paymentStatus),
+            transactionId: String(row.transaction_id ?? localOrder?.transactionId ?? ""),
+          };
+        }));
+      } catch (error) {
+        console.error("Erro ao carregar pedidos:", error);
+        toast.error("Nao foi possivel carregar pedidos.");
+      } finally {
+        if (isMounted) setOrdersLoading(false);
+      }
+    };
+
+    void loadOrders();
 
     return () => {
       isMounted = false;
@@ -414,15 +556,40 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteCustomer = async (customer: Customer) => {
+    const confirmed = window.confirm(`Excluir o cliente ${customer.nome}?`);
+    if (!confirmed) return;
+
+    setDeletingCustomerId(customer.id);
+
+    try {
+      if (supabase) {
+        const { error } = await supabase.from("clientes").delete().eq("id", customer.id);
+
+        if (error && !isMissingCustomersTableError(error)) throw error;
+      }
+
+      const nextCustomers = customers.filter(item => item.id !== customer.id);
+      setCustomers(nextCustomers);
+      saveLocalCustomers(loadLocalCustomers().filter(item => item.id !== customer.id && item.telefone !== customer.telefone));
+      toast.success("Cliente excluido!");
+    } catch (error) {
+      console.error("Erro ao excluir cliente:", error);
+      toast.error("Nao foi possivel excluir o cliente.");
+    } finally {
+      setDeletingCustomerId("");
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate("/");
   };
 
   const dashboardCards = [
-    { label: "Pedidos hoje", value: "0", icon: ClipboardList },
+    { label: "Pedidos hoje", value: String(orders.length), icon: ClipboardList },
     { label: "Faturamento", value: formatPrice(0), icon: DollarSign },
-    { label: "Clientes", value: "0", icon: Users },
+    { label: "Clientes", value: String(customers.length), icon: Users },
   ];
 
   const navItems = [
@@ -790,15 +957,37 @@ const AdminDashboard = () => {
           <div className="space-y-6">
             <h1 className="font-display text-4xl text-[#f0d8c0]">Pedidos</h1>
             <div className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
-              <div className="grid grid-cols-4 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
+              <div className="grid grid-cols-6 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
                 <span>Pedido</span>
                 <span>Cliente</span>
                 <span>Total</span>
+                <span>Pagamento</span>
+                <span>Status pag.</span>
                 <span>Status</span>
               </div>
-              <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
-                Nenhum pedido ainda
-              </div>
+              {ordersLoading ? (
+                <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">Carregando pedidos...</div>
+              ) : orders.length === 0 ? (
+                <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
+                  Nenhum pedido ainda
+                </div>
+              ) : (
+                <div className="divide-y divide-[#603000]">
+                  {orders.map(order => (
+                    <div key={order.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-6 md:gap-4">
+                      <span className="font-bold">{formatDateTime(order.createdAt)}</span>
+                      <span>{order.customerName}</span>
+                      <span className="font-bold text-[#f0d8a8]">{formatPrice(order.total)}</span>
+                      <span>{paymentMethodLabel(order.paymentMethod)}</span>
+                      <span className={order.paymentStatus === "aprovado" ? "font-bold text-green-300" : order.paymentStatus === "recusado" ? "font-bold text-red-300" : "font-bold text-yellow-200"}>
+                        {order.paymentStatus}
+                        {order.transactionId && <span className="block break-all text-xs font-normal text-[#d8c0a8]">{order.transactionId}</span>}
+                      </span>
+                      <span className="font-bold text-green-300">{order.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -812,7 +1001,7 @@ const AdminDashboard = () => {
                 <span>WhatsApp</span>
                 <span>Empresa</span>
                 <span>Status</span>
-                <span>Limite</span>
+                <span>Acoes</span>
               </div>
               {customersLoading ? (
                 <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">Carregando clientes...</div>
@@ -821,12 +1010,21 @@ const AdminDashboard = () => {
               ) : (
                 <div className="divide-y divide-[#603000]">
                   {customers.map(customer => (
-                    <div key={customer.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-5 md:gap-4">
+                    <div key={customer.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-5 md:items-center md:gap-4">
                       <span className="font-bold">{customer.nome}</span>
                       <span>{formatPhone(customer.telefone)}</span>
                       <span>{customer.empresa_unidade}</span>
                       <span className={customer.status === "ativo" ? "font-bold text-green-300" : "font-bold text-red-300"}>{customer.status}</span>
-                      <span>{formatPrice(customer.limite)}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-fit gap-2 border-red-300 bg-transparent text-red-200 hover:bg-red-950/40 hover:text-red-100"
+                        disabled={deletingCustomerId === customer.id}
+                        onClick={() => void handleDeleteCustomer(customer)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir
+                      </Button>
                     </div>
                   ))}
                 </div>

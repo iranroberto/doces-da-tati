@@ -47,7 +47,6 @@ create table if not exists public.clientes (
   telefone text not null unique,
   empresa_unidade text not null default '',
   status text not null default 'ativo' check (status in ('ativo', 'bloqueado')),
-  limite numeric not null default 20,
   criado_em timestamptz not null default now(),
   atualizado_em timestamptz not null default now()
 );
@@ -57,6 +56,10 @@ create table if not exists public.pedidos (
   cliente_id uuid references public.clientes(id) on delete set null,
   status text not null default 'aberto',
   total numeric not null default 0,
+  forma_pagamento text not null default 'pix' check (forma_pagamento in ('pix', 'dinheiro', 'credito', 'debito')),
+  status_pagamento text not null default 'pendente' check (status_pagamento in ('aprovado', 'pendente', 'recusado', 'cancelado')),
+  transaction_id text,
+  pago_em timestamptz,
   criado_em timestamptz not null default now(),
   atualizado_em timestamptz not null default now()
 );
@@ -69,17 +72,6 @@ create table if not exists public.pagamentos (
   metodo text not null default 'pix',
   status text not null default 'pendente',
   criado_em timestamptz not null default now()
-);
-
-create table if not exists public.dividas (
-  id uuid primary key default gen_random_uuid(),
-  cliente_id uuid references public.clientes(id) on delete cascade,
-  pedido_id uuid references public.pedidos(id) on delete set null,
-  valor numeric not null default 0,
-  status text not null default 'aberta',
-  vencimento date,
-  criado_em timestamptz not null default now(),
-  atualizado_em timestamptz not null default now()
 );
 
 alter table public.products
@@ -98,13 +90,31 @@ alter table public.store_config
   add column if not exists show_filter_available boolean not null default true,
   add column if not exists show_category_filter boolean not null default true;
 
+alter table public.clientes
+  drop column if exists limite;
+
+alter table public.pedidos
+  add column if not exists forma_pagamento text not null default 'pix',
+  add column if not exists status_pagamento text not null default 'pendente',
+  add column if not exists transaction_id text,
+  add column if not exists pago_em timestamptz;
+
+alter table public.pedidos
+  drop constraint if exists pedidos_forma_pagamento_check,
+  add constraint pedidos_forma_pagamento_check check (forma_pagamento in ('pix', 'dinheiro', 'credito', 'debito'));
+
+alter table public.pedidos
+  drop constraint if exists pedidos_status_pagamento_check,
+  add constraint pedidos_status_pagamento_check check (status_pagamento in ('aprovado', 'pendente', 'recusado', 'cancelado'));
+
+drop table if exists public.dividas;
+
 alter table public.store_config enable row level security;
 alter table public.products enable row level security;
 alter table public.categories enable row level security;
 alter table public.clientes enable row level security;
 alter table public.pedidos enable row level security;
 alter table public.pagamentos enable row level security;
-alter table public.dividas enable row level security;
 
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.store_config to anon, authenticated;
@@ -113,7 +123,6 @@ grant select, insert, update, delete on public.categories to anon, authenticated
 grant select, insert, update, delete on public.clientes to anon, authenticated;
 grant select, insert, update, delete on public.pedidos to anon, authenticated;
 grant select, insert, update, delete on public.pagamentos to anon, authenticated;
-grant select, insert, update, delete on public.dividas to anon, authenticated;
 
 drop policy if exists "Public can read store config" on public.store_config;
 drop policy if exists "Public can write store config" on public.store_config;
@@ -127,8 +136,6 @@ drop policy if exists "Public can read orders" on public.pedidos;
 drop policy if exists "Public can write orders" on public.pedidos;
 drop policy if exists "Public can read payments" on public.pagamentos;
 drop policy if exists "Public can write payments" on public.pagamentos;
-drop policy if exists "Public can read debts" on public.dividas;
-drop policy if exists "Public can write debts" on public.dividas;
 
 create policy "Public can read store config"
   on public.store_config for select
@@ -181,15 +188,6 @@ create policy "Public can read payments"
 
 create policy "Public can write payments"
   on public.pagamentos for all
-  using (true)
-  with check (true);
-
-create policy "Public can read debts"
-  on public.dividas for select
-  using (true);
-
-create policy "Public can write debts"
-  on public.dividas for all
   using (true)
   with check (true);
 

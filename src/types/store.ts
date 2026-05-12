@@ -47,6 +47,7 @@ export interface CartItem {
 }
 
 export interface CustomerInfo {
+  id?: string;
   name: string;
   whatsapp: string;
 }
@@ -59,6 +60,5 @@ export interface Customer {
   telefone: string;
   empresa_unidade: string;
   status: CustomerStatus;
-  limite: number;
   criado_em: string;
 }

@@ -6,7 +6,6 @@ import type { Customer } from "@/types/store";
 
 const CUSTOMER_SESSION_KEY = "customer_session";
 const LOCAL_CUSTOMERS_KEY = "store_customers";
-const DEFAULT_LIMIT = 20;
 
 interface CustomerSession {
   token: string;
@@ -51,7 +50,6 @@ const customerFromRow = (row: Record<string, unknown>): Customer => ({
   telefone: String(row.telefone ?? ""),
   empresa_unidade: String(row.empresa_unidade ?? ""),
   status: String(row.status ?? "ativo") === "bloqueado" ? "bloqueado" : "ativo",
-  limite: Number(row.limite ?? DEFAULT_LIMIT),
   criado_em: String(row.criado_em ?? new Date().toISOString()),
 });
 
@@ -89,12 +87,21 @@ const findLocalCustomerBySession = (session: CustomerSession) =>
   loadLocalCustomers().find(customer => customer.id === session.customerId && customer.telefone === session.telefone)
   ?? findLocalCustomerByPhone(session.telefone);
 
+const isMissingCustomersTableError = (error: unknown) => {
+  const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+  return code === "PGRST205" || code === "42P01";
+};
+
 const getCustomerSaveErrorMessage = (error: unknown) => {
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+  const message = typeof error === "object" && error && "message" in error ? String(error.message) : "";
 
   if (code === "23505") return "Telefone ja cadastrado.";
-  if (code === "23502") return "Preencha nome, loja e WhatsApp.";
+  if (code === "23502") return "Preencha nome, local e WhatsApp.";
   if (code === "42501") return "Sem permissao para cadastrar cliente no banco.";
+  if (code === "42P01") return "Tabela clientes nao existe no Supabase.";
+  if (code === "42703") return "Coluna obrigatoria nao existe na tabela clientes.";
+  if (message.toLowerCase().includes("failed to fetch")) return "Nao foi possivel conectar ao Supabase.";
 
   return "Nao foi possivel criar a conta.";
 };
@@ -112,6 +119,7 @@ export const CustomerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       .eq("telefone", telefone)
       .maybeSingle();
 
+    if (isMissingCustomersTableError(error)) return findLocalCustomerByPhone(telefone);
     if (error) throw error;
     return data ? customerFromRow(data) : null;
   }, []);
@@ -125,6 +133,7 @@ export const CustomerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       .eq("telefone", session.telefone)
       .maybeSingle();
 
+    if (isMissingCustomersTableError(error)) return findLocalCustomerBySession(session);
     if (error) throw error;
     return data ? customerFromRow(data) : null;
   }, []);
@@ -186,11 +195,12 @@ export const CustomerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const empresaUnidade = input.empresa_unidade.trim();
 
     if (!nome || !empresaUnidade || !isValidPhone(telefone)) {
-      toast.error("Preencha nome, loja e WhatsApp valido.");
+      toast.error("Preencha nome, local e WhatsApp valido.");
       return false;
     }
 
-    if (!supabase && findLocalCustomerByPhone(telefone)) {
+    const savedCustomer = await fetchCustomerByPhone(telefone);
+    if (savedCustomer) {
       toast.error("Telefone ja cadastrado.");
       return false;
     }
@@ -201,35 +211,46 @@ export const CustomerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       telefone,
       empresa_unidade: empresaUnidade,
       status: "ativo",
-      limite: DEFAULT_LIMIT,
       criado_em: new Date().toISOString(),
     };
 
+    const saveCustomerLocally = () => {
+      const customers = loadLocalCustomers();
+      saveLocalCustomers([...customers, nextCustomer]);
+      setCustomer(nextCustomer);
+      saveSession(nextCustomer);
+    };
+
     if (supabase) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("clientes")
         .insert({
-          nome: nextCustomer.nome,
-          telefone: nextCustomer.telefone,
-          empresa_unidade: nextCustomer.empresa_unidade,
-          status: nextCustomer.status,
-          limite: nextCustomer.limite,
-          criado_em: nextCustomer.criado_em,
-        });
+          nome,
+          telefone,
+          empresa_unidade: empresaUnidade,
+          status: "ativo",
+        })
+        .select("*")
+        .single();
 
       if (error) {
+        if (isMissingCustomersTableError(error)) {
+          console.warn("Tabela clientes nao encontrada no Supabase. Salvando cliente localmente.", error);
+          saveCustomerLocally();
+          toast.warning("Banco sem tabela clientes. Conta criada neste aparelho.");
+          return true;
+        }
+
         console.error("Erro do Supabase ao cadastrar cliente:", error);
         toast.error(getCustomerSaveErrorMessage(error));
         return false;
       }
 
-      setCustomer(nextCustomer);
-      saveSession(nextCustomer);
+      const createdCustomer = customerFromRow(data);
+      setCustomer(createdCustomer);
+      saveSession(createdCustomer);
     } else {
-      const customers = loadLocalCustomers();
-      saveLocalCustomers([...customers, nextCustomer]);
-      setCustomer(nextCustomer);
-      saveSession(nextCustomer);
+      saveCustomerLocally();
     }
 
     toast.success("Conta criada!");

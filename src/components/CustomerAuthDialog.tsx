@@ -1,10 +1,15 @@
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { LogIn, MapPin, Phone, UserRound, UserRoundPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { formatPhone } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -13,7 +18,10 @@ interface CustomerAuthDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => {
+const CustomerAuthDialog = ({
+  open,
+  onOpenChange,
+}: CustomerAuthDialogProps) => {
   const { loginByPhone, createCustomer } = useCustomerAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [phone, setPhone] = useState("");
@@ -28,6 +36,9 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
     }
 
     setMode("login");
+    setPhone("");
+    setName("");
+    setCompanyUnit("");
   }, [open]);
 
   const handlePhoneChange = (value: string) => setPhone(formatPhone(value));
@@ -36,7 +47,9 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
     setIsSubmitting(true);
     try {
       const success = await loginByPhone(phone);
-      if (success) onOpenChange(false);
+      if (success) {
+        onOpenChange(false);
+      }
     } catch (error) {
       console.error("Erro ao entrar como cliente:", error);
       toast.error("Nao foi possivel entrar agora.");
@@ -54,7 +67,12 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
         empresa_unidade: companyUnit,
       });
 
-      if (success) onOpenChange(false);
+      if (success) {
+        setPhone("");
+        setName("");
+        setCompanyUnit("");
+        onOpenChange(false);
+      }
     } catch (error) {
       console.error("Erro ao cadastrar cliente:", error);
       toast.error("Nao foi possivel criar a conta.");
@@ -63,19 +81,35 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
     }
   };
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+
+    if (mode === "login") {
+      void submitLogin();
+      return;
+    }
+
+    void submitRegister();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-2rem)] max-w-sm rounded-lg p-0">
         <div className="border-b border-border bg-primary px-5 py-5 text-primary-foreground">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
-              {mode === "login" ? <LogIn className="h-5 w-5" /> : <UserRoundPlus className="h-5 w-5" />}
+              {mode === "login" ? (
+                <LogIn className="h-5 w-5" />
+              ) : (
+                <UserRoundPlus className="h-5 w-5" />
+              )}
               {mode === "login" ? "Entrar rapido" : "Criar conta"}
             </DialogTitle>
           </DialogHeader>
         </div>
 
-        <div className="space-y-4 px-5 py-5">
+        <form className="space-y-4 px-5 py-5" onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 rounded-lg border border-border bg-muted p-1">
             <Button
               type="button"
@@ -101,15 +135,27 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
                 <Label>Nome</Label>
                 <div className="relative mt-1">
                   <UserRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={name} onChange={event => setName(event.target.value)} className="pl-9" placeholder="Seu nome" required />
+                  <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    className="pl-9"
+                    placeholder="Seu nome"
+                    required
+                  />
                 </div>
               </div>
 
               <div>
-                <Label>Loja</Label>
+                <Label>Local</Label>
                 <div className="relative mt-1">
                   <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={companyUnit} onChange={event => setCompanyUnit(event.target.value)} className="pl-9" placeholder="Loja" required />
+                  <Input
+                    value={companyUnit}
+                    onChange={(event) => setCompanyUnit(event.target.value)}
+                    className="pl-9"
+                    placeholder="Seu local"
+                    required
+                  />
                 </div>
               </div>
             </>
@@ -121,7 +167,7 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
               <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={phone}
-                onChange={event => handlePhoneChange(event.target.value)}
+                onChange={(event) => handlePhoneChange(event.target.value)}
                 inputMode="tel"
                 className="pl-9"
                 placeholder="(21) 99999-9999"
@@ -131,24 +177,42 @@ const CustomerAuthDialog = ({ open, onOpenChange }: CustomerAuthDialogProps) => 
           </div>
 
           <Button
+            type="submit"
             className="h-11 w-full gap-2 text-base font-bold"
             disabled={isSubmitting}
-            onClick={mode === "login" ? submitLogin : submitRegister}
           >
-            {mode === "login" ? <LogIn className="h-4 w-4" /> : <UserRoundPlus className="h-4 w-4" />}
-            {isSubmitting ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
+            {mode === "login" ? (
+              <LogIn className="h-4 w-4" />
+            ) : (
+              <UserRoundPlus className="h-4 w-4" />
+            )}
+            {isSubmitting
+              ? "Aguarde..."
+              : mode === "login"
+                ? "Entrar"
+                : "Criar conta"}
           </Button>
 
           {mode === "login" ? (
-            <Button type="button" variant="ghost" className="w-full" onClick={() => setMode("register")}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => setMode("register")}
+            >
               Criar conta
             </Button>
           ) : (
-            <Button type="button" variant="ghost" className="w-full" onClick={() => setMode("login")}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => setMode("login")}
+            >
               Ja tenho cadastro
             </Button>
           )}
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
