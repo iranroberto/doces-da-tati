@@ -11,6 +11,7 @@ export const onRequestPost = async ({ request, env }) => {
     const orderId = String(body.orderId || "");
     const total = Number(body.total || 0);
     const customerName = String(body.customerName || "Cliente");
+    const storeName = String(body.storeName || env.STORE_NAME || "Loja");
     const payerEmail = String(body.customerEmail || env.MERCADO_PAGO_DEFAULT_PAYER_EMAIL || "cliente@docesdatati.com.br");
 
     if (!orderId || !total || total <= 0) {
@@ -26,13 +27,13 @@ export const onRequestPost = async ({ request, env }) => {
       },
       body: JSON.stringify({
         transaction_amount: total,
-        description: `Pedido Doces da Tati - ${customerName}`,
+        description: `Pedido ${storeName} - ${customerName}`.slice(0, 255),
         payment_method_id: "pix",
         external_reference: orderId,
         payer: {
           email: payerEmail,
           first_name: customerName.split(" ")[0] || "Cliente",
-          last_name: customerName.split(" ").slice(1).join(" ") || "Doces da Tati",
+          last_name: customerName.split(" ").slice(1).join(" ") || "Cliente",
         },
         notification_url: env.MERCADO_PAGO_WEBHOOK_URL,
       }),

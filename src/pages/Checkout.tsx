@@ -166,9 +166,7 @@ const Checkout = () => {
 
     if (!paymentId || !orderId) return;
 
-    if (showSuccessToast) {
-      setIsProcessing(true);
-    }
+    setIsProcessing(true);
     try {
       const response = await fetch(`/api/get-mercado-pago-payment?payment_id=${encodeURIComponent(paymentId)}&order_id=${encodeURIComponent(orderId)}`);
       const result = await response.json();
@@ -365,6 +363,7 @@ const Checkout = () => {
           orderId: savedOrder.registeredOrderId,
           total: savedOrder.total,
           customerName: savedOrder.customer?.name,
+          storeName: config.name,
         }),
       });
       const result = await response.json();
