@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
 import { type PaymentMethod, type PaymentStatus, paymentMethodLabel, registerOrder, updateOrderPayment } from "@/lib/orders";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { CustomerInfo } from "@/types/store";
 
 interface CheckoutItem {
@@ -25,6 +27,7 @@ interface PendingCheckout {
   transactionId?: string;
   paidAt?: string;
   registeredOrderId?: string;
+  customerEmail?: string;
   pixQrCode?: string;
   pixQrCodeBase64?: string;
   pixTicketUrl?: string;
@@ -75,6 +78,7 @@ const loadPendingCheckout = (): PendingCheckout | null => {
       transactionId: value.transactionId ? String(value.transactionId) : undefined,
       paidAt: value.paidAt ? String(value.paidAt) : undefined,
       registeredOrderId: value.registeredOrderId ? String(value.registeredOrderId) : undefined,
+      customerEmail: value.customerEmail ? String(value.customerEmail) : undefined,
       pixQrCode: value.pixQrCode ? String(value.pixQrCode) : undefined,
       pixQrCodeBase64: value.pixQrCodeBase64 ? String(value.pixQrCodeBase64) : undefined,
       pixTicketUrl: value.pixTicketUrl ? String(value.pixTicketUrl) : undefined,
@@ -99,6 +103,14 @@ const readApiJson = async (response: Response) => {
   }
 };
 
+const getApiErrorMessage = (result: Record<string, unknown>, fallback: string) => {
+  const details = result.details as { cause?: Array<{ description?: string }> } | undefined;
+  const causeDescription = details?.cause?.map(cause => cause.description).filter(Boolean).join(" ");
+  return String(result.error || result.message || causeDescription || fallback);
+};
+
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
 const getMercadoPagoReturnParams = () => {
   const query = window.location.hash.split("?")[1] || window.location.search.slice(1);
   return new URLSearchParams(query);
@@ -111,6 +123,7 @@ const Checkout = () => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pendente");
   const [isProcessing, setIsProcessing] = useState(false);
   const [pixPayment, setPixPayment] = useState<PixPayment | null>(null);
+  const [customerEmail, setCustomerEmail] = useState("");
 
   useEffect(() => {
     const savedOrder = loadPendingCheckout();
@@ -122,6 +135,10 @@ const Checkout = () => {
 
     if (savedOrder?.paymentStatus) {
       setPaymentStatus(savedOrder.paymentStatus);
+    }
+
+    if (savedOrder?.customerEmail) {
+      setCustomerEmail(savedOrder.customerEmail);
     }
 
     if (savedOrder?.transactionId && savedOrder.paymentMethod === "pix") {
@@ -183,7 +200,7 @@ const Checkout = () => {
       const result = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(result.error || "Nao foi possivel verificar o Pix.");
+        throw new Error(getApiErrorMessage(result, "Nao foi possivel verificar o Pix."));
       }
 
       const nextStatus = (result.status || "pendente") as PaymentStatus;
@@ -328,6 +345,19 @@ const Checkout = () => {
     });
   };
 
+  const handleCustomerEmailChange = (value: string) => {
+    setCustomerEmail(value);
+
+    if (!order) return;
+
+    const nextOrder = {
+      ...order,
+      customerEmail: value,
+    };
+    setOrder(nextOrder);
+    savePendingCheckout(nextOrder);
+  };
+
   const copyPixCode = async () => {
     if (!pixPayment?.qrCode) return;
 
@@ -366,6 +396,11 @@ const Checkout = () => {
 
     setIsProcessing(true);
     try {
+      if (!isValidEmail(customerEmail)) {
+        toast.error("Informe o e-mail do cliente para gerar o Pix.");
+        return;
+      }
+
       const savedOrder = await ensureRegisteredOrder("pix", "pendente");
       const response = await fetch("/api/create-mercado-pago-pix", {
         method: "POST",
@@ -374,13 +409,14 @@ const Checkout = () => {
           orderId: savedOrder.registeredOrderId,
           total: savedOrder.total,
           customerName: savedOrder.customer?.name,
+          customerEmail: customerEmail.trim(),
           storeName: config.name,
         }),
       });
       const result = await readApiJson(response);
 
       if (!response.ok || !result.qrCode) {
-        throw new Error(result.error || "Nao foi possivel gerar o Pix.");
+        throw new Error(getApiErrorMessage(result, "Nao foi possivel gerar o Pix."));
       }
 
       const nextPixPayment = {
@@ -394,6 +430,7 @@ const Checkout = () => {
         paymentMethod: "pix",
         paymentStatus: "pendente" as PaymentStatus,
         transactionId: result.paymentId,
+        customerEmail: customerEmail.trim(),
         pixQrCode: nextPixPayment.qrCode,
         pixQrCodeBase64: nextPixPayment.qrCodeBase64,
         pixTicketUrl: nextPixPayment.ticketUrl,
@@ -549,6 +586,24 @@ const Checkout = () => {
           {(selectedPaymentMethod === "credito" || selectedPaymentMethod === "debito") && (
             <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
               O pagamento sera processado em ambiente seguro do Mercado Pago.
+            </div>
+          )}
+
+          {isPixPayment && !pixPayment?.paymentId && (
+            <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-3">
+              <Label htmlFor="pix-customer-email" className="text-sm font-bold">E-mail do cliente</Label>
+              <Input
+                id="pix-customer-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="cliente@email.com"
+                value={customerEmail}
+                onChange={event => handleCustomerEmailChange(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                O Mercado Pago precisa do e-mail do pagador para gerar o Pix com confirmacao automatica.
+              </p>
             </div>
           )}
 

@@ -13,6 +13,14 @@ const readJson = async (response) => {
   }
 };
 
+const getMercadoPagoError = (result) => {
+  const causeDescription = Array.isArray(result.cause)
+    ? result.cause.map(cause => cause.description).filter(Boolean).join(" ")
+    : "";
+
+  return result.message || result.error || causeDescription || "Nao foi possivel gerar o Pix no Mercado Pago.";
+};
+
 export const onRequestPost = async ({ request, env }) => {
   const accessToken = env.MERCADO_PAGO_ACCESS_TOKEN;
   if (!accessToken) return json({ error: "MERCADO_PAGO_ACCESS_TOKEN nao configurado." }, 500);
@@ -23,10 +31,14 @@ export const onRequestPost = async ({ request, env }) => {
     const total = Number(body.total || 0);
     const customerName = String(body.customerName || "Cliente");
     const storeName = String(body.storeName || env.STORE_NAME || "Loja");
-    const payerEmail = String(body.customerEmail || env.MERCADO_PAGO_DEFAULT_PAYER_EMAIL || "cliente@docesdatati.com.br");
+    const payerEmail = String(body.customerEmail || "").trim();
 
     if (!orderId || !total || total <= 0) {
       return json({ error: "Dados invalidos para criar PIX." }, 400);
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
+      return json({ error: "Informe um e-mail valido do cliente para gerar o Pix." }, 400);
     }
 
     const response = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -53,7 +65,7 @@ export const onRequestPost = async ({ request, env }) => {
 
     if (!response.ok) {
       return json({
-        error: result.message || result.error || "Nao foi possivel gerar o Pix no Mercado Pago.",
+        error: getMercadoPagoError(result),
         details: result,
       }, response.status);
     }
