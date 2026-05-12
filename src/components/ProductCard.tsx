@@ -78,19 +78,19 @@ const ProductCard = ({ product }: { product: Product }) => {
             <p className="mb-1 text-xs font-bold uppercase tracking-wide text-primary">{category.name}</p>
           )}
           <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-tight text-card-foreground sm:min-h-14 sm:text-lg">{product.name}</h3>
-          <div className="mt-1 flex items-center gap-1 text-xs font-bold text-primary">
-            <span className="flex items-center gap-0.5" aria-label={`Media ${ratingSummary.average.toFixed(1)} de 5 estrelas`}>
-              {Array.from({ length: 5 }).map((_, index) => (
-                <Star
-                  key={index}
-                  className={index < Math.round(ratingSummary.average) ? "h-3.5 w-3.5 fill-current" : "h-3.5 w-3.5 text-muted-foreground/40"}
-                />
-              ))}
-            </span>
-            <span className="text-muted-foreground">
-              {ratingSummary.count ? `${ratingSummary.average.toFixed(1)} (${ratingSummary.count})` : "Sem avaliacoes"}
-            </span>
-          </div>
+          {ratingSummary.count > 0 && (
+            <div className="mt-1 flex items-center gap-1 text-xs font-bold text-primary">
+              <span className="flex items-center gap-0.5" aria-label={`Media ${ratingSummary.average.toFixed(1)} de 5 estrelas`}>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <Star
+                    key={index}
+                    className={index < Math.round(ratingSummary.average) ? "h-3.5 w-3.5 fill-current" : "h-3.5 w-3.5 text-muted-foreground/40"}
+                  />
+                ))}
+              </span>
+              <span className="text-muted-foreground">{ratingSummary.average.toFixed(1)} ({ratingSummary.count})</span>
+            </div>
+          )}
           <p className="mt-1 line-clamp-2 min-h-9 text-xs text-muted-foreground sm:min-h-10 sm:text-sm">{product.description}</p>
         </div>
 
