@@ -15,7 +15,7 @@ const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
   const match = config.name.match(/^(.*?)(vizio)$/i);
   const prefixName = match?.[1]?.trim();
   const scriptName = match?.[2] || config.name;
-  const hasBanner = config.showBanner && config.bannerImage;
+  const hasBanner = Boolean(config.bannerImage);
   const customerName = customer?.nome.trim() || "Cliente";
 
   return (

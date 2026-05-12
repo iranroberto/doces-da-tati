@@ -1099,7 +1099,7 @@ const AdminDashboard = () => {
 
                     <div className="flex items-center gap-2">
                       <Switch checked={showBanner} onCheckedChange={checked => { setStoreFormDirty(true); setShowBanner(checked); }} />
-                      <Label>Banner visivel no topo da vitrine</Label>
+                      <Label>Banner ativo no topo da vitrine</Label>
                     </div>
 
                     <div className="flex items-center gap-2">
