@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
-import { loadLocalOrders, normalizePaymentStatus, paymentMethodLabel, updateOrderStatus, type PaymentStatus } from "@/lib/orders";
+import { deleteOrder, loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, updateOrderStatus, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
 import { getProductPrice, hasPromotionalPrice } from "@/lib/pricing";
 import { formatPhone } from "@/lib/phone";
 import { supabase } from "@/lib/supabase";
@@ -52,6 +52,7 @@ interface AdminOrder {
   paymentMethod: string;
   paymentStatus: PaymentStatus;
   transactionId: string;
+  items: OrderItemDraft[];
 }
 
 interface CustomerOrderGroup {
@@ -93,6 +94,7 @@ const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
       paymentMethod: String(row.forma_pagamento ?? localOrder?.paymentMethod ?? "pix"),
       paymentStatus: normalizePaymentStatus(row.status_pagamento ?? localOrder?.paymentStatus),
       transactionId: String(row.transaction_id ?? localOrder?.transactionId ?? ""),
+      items: parseOrderItems(row.itens ?? localOrder?.items),
     };
   });
 };
@@ -131,6 +133,14 @@ const formatDateTime = (value: string) => {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+};
+
+const formatOrderItems = (items: OrderItemDraft[]) => {
+  if (!items.length) return "Itens nao registrados neste pedido";
+
+  return items
+    .map(item => `${item.quantity}x ${item.name} (${formatPrice(item.price * item.quantity)})`)
+    .join(", ");
 };
 
 const productSignature = (product: Product) => JSON.stringify({
@@ -212,6 +222,7 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [updatingOrderStatusId, setUpdatingOrderStatusId] = useState("");
+  const [deletingOrderId, setDeletingOrderId] = useState("");
 
   const buildProductData = (productId: string): { product?: Product; error?: string } => {
     const price = Number(pPrice);
@@ -384,7 +395,7 @@ const AdminDashboard = () => {
 
         const result = await supabase
           .from("pedidos")
-          .select("id, criado_em, status, total, forma_pagamento, status_pagamento, transaction_id, clientes(nome)")
+          .select("id, criado_em, status, total, forma_pagamento, status_pagamento, transaction_id, itens, clientes(nome)")
           .order("criado_em", { ascending: false });
 
         let data = result.data;
@@ -741,6 +752,24 @@ const AdminDashboard = () => {
       toast.error("Nao foi possivel atualizar o pedido.");
     } finally {
       setUpdatingOrderStatusId("");
+    }
+  };
+
+  const handleDeleteOrder = async (order: AdminOrder) => {
+    const confirmed = window.confirm(`Apagar o pedido de ${order.customerName} no valor de ${formatPrice(order.total)}?`);
+    if (!confirmed) return;
+
+    setDeletingOrderId(order.id);
+
+    try {
+      await deleteOrder(order.id);
+      setOrders(current => current.filter(item => item.id !== order.id));
+      toast.success("Pedido apagado.");
+    } catch (error) {
+      console.error("Erro ao apagar pedido:", error);
+      toast.error("Nao foi possivel apagar o pedido.");
+    } finally {
+      setDeletingOrderId("");
     }
   };
 
@@ -1230,10 +1259,14 @@ const AdminDashboard = () => {
                         const delivered = order.status === "entregue";
 
                         return (
-                          <article key={order.id} className="grid grid-cols-1 gap-3 px-5 py-4 text-sm text-[#f0d8c0] lg:grid-cols-[1.2fr_1fr_1fr_1.3fr_auto] lg:items-center">
+                          <article key={order.id} className="grid grid-cols-1 gap-3 px-5 py-4 text-sm text-[#f0d8c0] lg:grid-cols-[1fr_1.5fr_0.8fr_1fr_1.1fr_auto] lg:items-center">
                             <div>
                               <p className="text-xs font-bold uppercase text-[#d8c0a8]">Data</p>
                               <p className="font-bold">{formatDateTime(order.createdAt)}</p>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold uppercase text-[#d8c0a8]">Itens comprados</p>
+                              <p className="font-semibold text-[#f0d8c0]">{formatOrderItems(order.items)}</p>
                             </div>
                             <div>
                               <p className="text-xs font-bold uppercase text-[#d8c0a8]">Valor</p>
@@ -1253,18 +1286,30 @@ const AdminDashboard = () => {
                               </p>
                               {order.transactionId && <p className="break-all text-xs text-[#d8c0a8]">Transacao: {order.transactionId}</p>}
                             </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className={delivered
-                                ? "w-full gap-2 border-yellow-300 bg-transparent text-yellow-100 hover:bg-yellow-950/40 hover:text-yellow-50 lg:w-fit"
-                                : "w-full gap-2 border-green-300 bg-transparent text-green-100 hover:bg-green-950/40 hover:text-green-50 lg:w-fit"}
-                              disabled={updatingOrderStatusId === order.id}
-                              onClick={() => void toggleOrderDeliveryStatus(order)}
-                            >
-                              {delivered ? <ClipboardList className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
-                              {delivered ? "Marcar pendente" : "Marcar entregue"}
-                            </Button>
+                            <div className="flex flex-col gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={delivered
+                                  ? "w-full gap-2 border-yellow-300 bg-transparent text-yellow-100 hover:bg-yellow-950/40 hover:text-yellow-50"
+                                  : "w-full gap-2 border-green-300 bg-transparent text-green-100 hover:bg-green-950/40 hover:text-green-50"}
+                                disabled={updatingOrderStatusId === order.id || deletingOrderId === order.id}
+                                onClick={() => void toggleOrderDeliveryStatus(order)}
+                              >
+                                {delivered ? <ClipboardList className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
+                                {delivered ? "Marcar pendente" : "Marcar entregue"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full gap-2 border-red-300 bg-transparent text-red-200 hover:bg-red-950/40 hover:text-red-100"
+                                disabled={deletingOrderId === order.id || updatingOrderStatusId === order.id}
+                                onClick={() => void handleDeleteOrder(order)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Apagar
+                              </Button>
+                            </div>
                           </article>
                         );
                       })}

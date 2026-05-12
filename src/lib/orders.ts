@@ -59,6 +59,18 @@ const isMissingPaymentColumnsError = (error: unknown) => {
   return code === "42703" || code === "PGRST204";
 };
 
+const normalizeOrderItems = (items: unknown): OrderItemDraft[] => {
+  if (!Array.isArray(items)) return [];
+
+  return items.map((item: Partial<OrderItemDraft>) => ({
+    productId: String(item.productId ?? ""),
+    name: String(item.name ?? ""),
+    price: Number(item.price ?? 0),
+    quantity: Number(item.quantity ?? 0),
+    image: String(item.image ?? ""),
+  }));
+};
+
 export const loadLocalOrders = (): LocalOrder[] => {
   try {
     const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
@@ -77,7 +89,7 @@ export const loadLocalOrders = (): LocalOrder[] => {
       paymentStatus: normalizePaymentStatus(order.paymentStatus),
       transactionId: String(order.transactionId ?? ""),
       paidAt: String(order.paidAt ?? ""),
-      items: Array.isArray(order.items) ? order.items : [],
+      items: normalizeOrderItems(order.items),
     }));
   } catch {
     return [];
@@ -147,6 +159,7 @@ export const registerOrder = async (order: OrderDraft) => {
         forma_pagamento: order.paymentMethod,
         status_pagamento: normalizePaymentStatus(order.paymentStatus),
         transaction_id: order.transactionId || null,
+        itens: order.items,
         pago_em: order.paidAt || null,
       })
       .select("id")
@@ -236,3 +249,19 @@ export const updateOrderStatus = async (orderId: string, status: string) => {
     order.id === orderId ? { ...order, status } : order
   ))));
 };
+
+export const deleteOrder = async (orderId: string) => {
+  if (supabase && isUuid(orderId)) {
+    const { error } = await supabase
+      .from("pedidos")
+      .delete()
+      .eq("id", orderId);
+
+    if (error && !isMissingOrdersTableError(error)) throw error;
+  }
+
+  const orders = loadLocalOrders();
+  localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(orders.filter(order => order.id !== orderId)));
+};
+
+export const parseOrderItems = normalizeOrderItems;
