@@ -1,4 +1,4 @@
-import { corsHeaders, json, updateSupabaseOrderPayment } from "../_shared.js";
+import { corsHeaders, getMercadoPagoCredentials, json, updateSupabaseOrderPayment } from "../_shared.js";
 
 const allowedPaymentTypes = {
   pix: "bank_transfer",
@@ -15,7 +15,7 @@ const getSiteUrl = (request, env) => {
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders });
 
 export const onRequestPost = async ({ request, env }) => {
-  const accessToken = env.MERCADO_PAGO_ACCESS_TOKEN;
+  const { accessToken } = await getMercadoPagoCredentials(env);
   if (!accessToken) return json({ error: "MERCADO_PAGO_ACCESS_TOKEN nao configurado." }, 500);
 
   try {

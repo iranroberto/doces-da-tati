@@ -1,4 +1,4 @@
-import { corsHeaders, json, updateSupabaseOrderPayment } from "../_shared.js";
+import { corsHeaders, getMercadoPagoCredentials, json, updateSupabaseOrderPayment } from "../_shared.js";
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders });
 
@@ -21,8 +21,24 @@ const getMercadoPagoError = (result) => {
   return result.message || result.error || causeDescription || "Nao foi possivel gerar o Pix no Mercado Pago.";
 };
 
+const buildFallbackPayerEmail = (orderId) => {
+  const safeOrderId = String(orderId || "pedido")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "pedido";
+
+  return `cliente+${safeOrderId}@docesdatati.com.br`;
+};
+
+const getSiteUrl = (request, env) => {
+  if (env.SITE_URL) return env.SITE_URL;
+  const url = new URL(request.url);
+  return `${url.protocol}//${url.host}`;
+};
+
 export const onRequestPost = async ({ request, env }) => {
-  const accessToken = env.MERCADO_PAGO_ACCESS_TOKEN;
+  const { accessToken } = await getMercadoPagoCredentials(env);
   if (!accessToken) return json({ error: "MERCADO_PAGO_ACCESS_TOKEN nao configurado." }, 500);
 
   try {
@@ -31,7 +47,10 @@ export const onRequestPost = async ({ request, env }) => {
     const total = Number(body.total || 0);
     const customerName = String(body.customerName || "Cliente");
     const storeName = String(body.storeName || env.STORE_NAME || "Loja");
-    const payerEmail = String(body.customerEmail || env.MERCADO_PAGO_DEFAULT_PAYER_EMAIL || "").trim();
+    const payerEmail = String(
+      body.customerEmail || env.MERCADO_PAGO_DEFAULT_PAYER_EMAIL || buildFallbackPayerEmail(orderId)
+    ).trim();
+    const notificationUrl = env.MERCADO_PAGO_WEBHOOK_URL || `${getSiteUrl(request, env)}/api/mercado-pago-webhook`;
 
     if (!orderId || !total || total <= 0) {
       return json({ error: "Dados invalidos para criar PIX." }, 400);
@@ -60,7 +79,7 @@ export const onRequestPost = async ({ request, env }) => {
           first_name: customerName.split(" ")[0] || "Cliente",
           last_name: customerName.split(" ").slice(1).join(" ") || "Cliente",
         },
-        notification_url: env.MERCADO_PAGO_WEBHOOK_URL,
+        notification_url: notificationUrl,
       }),
     });
     const result = await readJson(response);

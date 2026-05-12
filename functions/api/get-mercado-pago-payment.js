@@ -1,9 +1,9 @@
-import { corsHeaders, json, mercadoPagoStatusToApp, updateSupabaseOrderPayment } from "../_shared.js";
+import { corsHeaders, getMercadoPagoCredentials, json, mercadoPagoStatusToApp, updateSupabaseOrderPayment } from "../_shared.js";
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders });
 
 export const onRequestGet = async ({ request, env }) => {
-  const accessToken = env.MERCADO_PAGO_ACCESS_TOKEN;
+  const { accessToken } = await getMercadoPagoCredentials(env);
   if (!accessToken) return json({ error: "MERCADO_PAGO_ACCESS_TOKEN nao configurado." }, 500);
 
   const url = new URL(request.url);

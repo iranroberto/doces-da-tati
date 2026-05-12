@@ -74,6 +74,13 @@ create table if not exists public.pagamentos (
   criado_em timestamptz not null default now()
 );
 
+create table if not exists public.mercado_pago_settings (
+  id text primary key default 'main',
+  access_token text not null default '',
+  public_key text not null default '',
+  updated_at timestamptz not null default now()
+);
+
 alter table public.products
   add column if not exists category_id text not null default '';
 
@@ -115,6 +122,7 @@ alter table public.categories enable row level security;
 alter table public.clientes enable row level security;
 alter table public.pedidos enable row level security;
 alter table public.pagamentos enable row level security;
+alter table public.mercado_pago_settings enable row level security;
 
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.store_config to anon, authenticated;
@@ -123,6 +131,7 @@ grant select, insert, update, delete on public.categories to anon, authenticated
 grant select, insert, update, delete on public.clientes to anon, authenticated;
 grant select, insert, update, delete on public.pedidos to anon, authenticated;
 grant select, insert, update, delete on public.pagamentos to anon, authenticated;
+revoke all on public.mercado_pago_settings from anon, authenticated;
 
 drop policy if exists "Public can read store config" on public.store_config;
 drop policy if exists "Public can write store config" on public.store_config;

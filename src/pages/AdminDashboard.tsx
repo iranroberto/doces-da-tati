@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, CheckCircle2, ClipboardList, DollarSign, Image, LogOut, Package, Pencil, Plus, Save, Store, Tags, Trash2, Users } from "lucide-react";
+import { BarChart3, CheckCircle2, ClipboardList, DollarSign, Image, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
@@ -28,6 +28,20 @@ const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
 const LOCAL_CUSTOMERS_KEY = "store_customers";
+
+const readApiJson = async (response: Response) => {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text };
+  }
+};
+
+const apiErrorMessage = (result: Record<string, unknown>, fallback: string) =>
+  String(result.error || result.message || fallback);
 
 interface AdminOrder {
   id: string;
@@ -136,6 +150,16 @@ const AdminDashboard = () => {
   const [showCategoryFilter, setShowCategoryFilter] = useState(config.showCategoryFilter);
   const [saveMessage, setSaveMessage] = useState("");
   const [storeFormDirty, setStoreFormDirty] = useState(false);
+  const [mpAccessToken, setMpAccessToken] = useState("");
+  const [mpPublicKey, setMpPublicKey] = useState("");
+  const [mpSettingsLoading, setMpSettingsLoading] = useState(false);
+  const [mpSettingsSaving, setMpSettingsSaving] = useState(false);
+  const [mpSettings, setMpSettings] = useState({
+    accessTokenConfigured: false,
+    publicKeyConfigured: false,
+    accessTokenMasked: "",
+    publicKeyMasked: "",
+  });
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -213,6 +237,35 @@ const AdminDashboard = () => {
     setShowFilterAvailable(config.showFilterAvailable);
     setShowCategoryFilter(config.showCategoryFilter);
   }, [config, storeFormDirty]);
+
+  useEffect(() => {
+    if (tab !== "store") return;
+
+    let isMounted = true;
+    setMpSettingsLoading(true);
+
+    fetch("/api/mercado-pago-settings")
+      .then(response => readApiJson(response))
+      .then(result => {
+        if (!isMounted) return;
+        setMpSettings({
+          accessTokenConfigured: Boolean(result.accessTokenConfigured),
+          publicKeyConfigured: Boolean(result.publicKeyConfigured),
+          accessTokenMasked: String(result.accessTokenMasked || ""),
+          publicKeyMasked: String(result.publicKeyMasked || ""),
+        });
+      })
+      .catch(error => {
+        console.error("Erro ao carregar credenciais Mercado Pago:", error);
+      })
+      .finally(() => {
+        if (isMounted) setMpSettingsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tab]);
 
   useEffect(() => {
     if (!dialogOpen || !editingProduct) return;
@@ -397,6 +450,49 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error("Erro ao salvar configuracoes da loja:", error);
       toast.error("Nao foi possivel salvar no banco online");
+    }
+  };
+
+  const saveMercadoPagoSettings = async () => {
+    if (!mpAccessToken.trim() && !mpPublicKey.trim()) {
+      toast.error("Informe o Access Token ou a Public Key para salvar.");
+      return;
+    }
+
+    setMpSettingsSaving(true);
+    try {
+      const response = await fetch("/api/mercado-pago-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessToken: mpAccessToken.trim(),
+          publicKey: mpPublicKey.trim(),
+          adminPassword: adminPw,
+        }),
+      });
+      const result = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(apiErrorMessage(result, "Nao foi possivel salvar as credenciais."));
+      }
+
+      const refreshed = await fetch("/api/mercado-pago-settings");
+      const refreshedResult = await readApiJson(refreshed);
+
+      setMpSettings({
+        accessTokenConfigured: Boolean(refreshedResult.accessTokenConfigured),
+        publicKeyConfigured: Boolean(refreshedResult.publicKeyConfigured),
+        accessTokenMasked: String(refreshedResult.accessTokenMasked || ""),
+        publicKeyMasked: String(refreshedResult.publicKeyMasked || ""),
+      });
+      setMpAccessToken("");
+      setMpPublicKey("");
+      toast.success("Credenciais Mercado Pago salvas no backend.");
+    } catch (error) {
+      console.error("Erro ao salvar Mercado Pago:", error);
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel salvar as credenciais.");
+    } finally {
+      setMpSettingsSaving(false);
     }
   };
 
@@ -776,6 +872,62 @@ const AdminDashboard = () => {
                     </Button>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5" />
+                  Mercado Pago
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                  {mpSettingsLoading ? (
+                    <p className="font-semibold text-muted-foreground">Verificando credenciais...</p>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="flex items-center gap-2 font-bold">
+                        <KeyRound className="h-4 w-4 text-primary" />
+                        Access Token: {mpSettings.accessTokenConfigured ? "configurado" : "nao configurado"}
+                      </p>
+                      {mpSettings.accessTokenMasked && <p className="break-all text-xs text-muted-foreground">{mpSettings.accessTokenMasked}</p>}
+                      <p className="flex items-center gap-2 font-bold">
+                        <KeyRound className="h-4 w-4 text-primary" />
+                        Public Key: {mpSettings.publicKeyConfigured ? "configurada" : "nao configurada"}
+                      </p>
+                      {mpSettings.publicKeyMasked && <p className="break-all text-xs text-muted-foreground">{mpSettings.publicKeyMasked}</p>}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label>Access Token</Label>
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    placeholder={mpSettings.accessTokenConfigured ? "Digite um novo token para substituir" : "APP_USR-..."}
+                    value={mpAccessToken}
+                    onChange={e => setMpAccessToken(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label>Public Key</Label>
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    placeholder={mpSettings.publicKeyConfigured ? "Digite uma nova public key para substituir" : "APP_USR-..."}
+                    value={mpPublicKey}
+                    onChange={e => setMpPublicKey(e.target.value)}
+                  />
+                </div>
+
+                <Button className="w-full gap-2" disabled={mpSettingsSaving} onClick={() => void saveMercadoPagoSettings()}>
+                  <Save className="h-4 w-4" />
+                  {mpSettingsSaving ? "Salvando..." : "Salvar credenciais"}
+                </Button>
               </CardContent>
             </Card>
 
