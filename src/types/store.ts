@@ -27,6 +27,7 @@ export interface StoreConfig {
   bannerHeight: number;
   showHeaderName: boolean;
   whatsapp: string;
+  instagram: string;
   pixKey: string;
   pixReceiverName: string;
   pixCity: string;

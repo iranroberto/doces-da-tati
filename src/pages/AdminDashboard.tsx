@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, CheckCircle2, ClipboardList, DollarSign, Image, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, Truck, Users } from "lucide-react";
+import { BarChart3, CheckCircle2, ClipboardList, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, Truck, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
@@ -170,6 +170,7 @@ const AdminDashboard = () => {
 
   const [storeName, setStoreName] = useState(config.name);
   const [whatsapp, setWhatsapp] = useState(config.whatsapp);
+  const [instagram, setInstagram] = useState(config.instagram);
   const [pixKey, setPixKey] = useState(config.pixKey);
   const [pixReceiverName, setPixReceiverName] = useState(config.pixReceiverName);
   const [pixCity, setPixCity] = useState(config.pixCity);
@@ -260,6 +261,7 @@ const AdminDashboard = () => {
 
     setStoreName(config.name);
     setWhatsapp(config.whatsapp);
+    setInstagram(config.instagram);
     setPixKey(config.pixKey);
     setPixReceiverName(config.pixReceiverName);
     setPixCity(config.pixCity);
@@ -486,6 +488,7 @@ const AdminDashboard = () => {
         ...config,
         name: storeName.trim(),
         whatsapp,
+        instagram: instagram.trim(),
         logo: config.logo,
         pixKey: pixKey.trim(),
         pixReceiverName: pixReceiverName.trim() || "DOCES DA TATI",
@@ -899,6 +902,18 @@ const AdminDashboard = () => {
                 <div>
                   <Label>Numero do WhatsApp (com DDD)</Label>
                   <Input placeholder="5511999999999" value={whatsapp} onChange={e => { setStoreFormDirty(true); setWhatsapp(e.target.value); }} />
+                </div>
+                <div>
+                  <Label>Instagram</Label>
+                  <div className="relative">
+                    <Instagram className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      placeholder="@docesdatati ou https://instagram.com/docesdatati"
+                      value={instagram}
+                      onChange={e => { setStoreFormDirty(true); setInstagram(e.target.value); }}
+                    />
+                  </div>
                 </div>
                 <div>
                   <Label>Chave Pix</Label>

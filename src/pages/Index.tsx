@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { PackageCheck, Search } from "lucide-react";
+import { Instagram, PackageCheck, Search } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
 import CartDrawer from "@/components/CartDrawer";
 import CustomerAuthDialog from "@/components/CustomerAuthDialog";
@@ -11,6 +11,20 @@ import { Input } from "@/components/ui/input";
 
 type ProductFilter = "all" | "promo" | "available";
 
+const getInstagramUrl = (value: string) => {
+  const cleaned = value.trim();
+  if (!cleaned) return "";
+  if (/^https?:\/\//i.test(cleaned)) return cleaned;
+
+  const username = cleaned
+    .replace(/^@/, "")
+    .replace(/^www\.instagram\.com\//i, "")
+    .replace(/^instagram\.com\//i, "")
+    .replace(/\/$/, "");
+
+  return username ? `https://instagram.com/${username}` : "";
+};
+
 const Index = () => {
   const { config, categories, products } = useStore();
   const [cartOpen, setCartOpen] = useState(false);
@@ -20,6 +34,7 @@ const Index = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   const visibleCategories = useMemo(() => categories.filter(category => category.isActive), [categories]);
+  const instagramUrl = useMemo(() => getInstagramUrl(config.instagram), [config.instagram]);
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -135,9 +150,20 @@ const Index = () => {
         )}
       </main>
 
-      <footer className="bg-muted py-6 text-center text-sm text-muted-foreground">
+      <footer className="flex flex-col items-center gap-2 bg-muted py-6 text-center text-sm text-muted-foreground">
         <p>(c) {new Date().getFullYear()} {config.name} - Todos os direitos reservados</p>
-        <Link to="/admin" className="mt-2 inline-block text-xs font-medium text-muted-foreground/80 hover:text-primary">
+        {instagramUrl && (
+          <a
+            href={instagramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-primary transition hover:bg-primary hover:text-primary-foreground"
+          >
+            <Instagram className="h-5 w-5" />
+          </a>
+        )}
+        <Link to="/admin" className="text-xs font-medium text-muted-foreground/80 hover:text-primary">
           Acesso restrito
         </Link>
       </footer>
