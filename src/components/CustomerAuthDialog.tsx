@@ -68,6 +68,7 @@ const CustomerAuthDialog = ({
       });
 
       if (success) {
+        toast.success(`Seja bem-vindo, ${name.trim()}!`);
         setPhone("");
         setName("");
         setCompanyUnit("");

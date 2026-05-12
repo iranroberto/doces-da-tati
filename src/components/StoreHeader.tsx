@@ -57,7 +57,7 @@ const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
             <>
               <div className="hidden max-w-[260px] items-center gap-2 rounded-full bg-primary-foreground/12 px-3 py-2 text-sm font-bold sm:flex">
                 <UserRound className="h-4 w-4" />
-                <span className="min-w-0 truncate">Seja bem-vindo, {customerName}</span>
+                <span className="min-w-0 truncate">{customerName}</span>
                 <button className="text-primary-foreground/80 hover:text-primary-foreground" onClick={logoutCustomer} aria-label="Sair da conta">
                   <LogOut className="h-4 w-4" />
                 </button>
