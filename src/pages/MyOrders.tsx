@@ -43,6 +43,39 @@ const mapOrderRows = (rows: Record<string, unknown>[]): CustomerOrder[] =>
     items: parseOrderItems(row.itens),
   }));
 
+const localOrdersForCustomer = (customerId: string, telefone: string): CustomerOrder[] =>
+  loadLocalOrders()
+    .filter(order => order.customerId === customerId || order.customerWhatsapp === telefone)
+    .map(order => ({
+      id: order.id,
+      createdAt: order.createdAt,
+      total: order.total,
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      items: order.items,
+    }));
+
+const mergeOrders = (remoteOrders: CustomerOrder[], localOrders: CustomerOrder[]) => {
+  const ordersById = new Map<string, CustomerOrder>();
+
+  localOrders.forEach(order => {
+    ordersById.set(order.id, order);
+  });
+
+  remoteOrders.forEach(order => {
+    const localOrder = ordersById.get(order.id);
+    ordersById.set(order.id, {
+      ...order,
+      items: order.items.length ? order.items : localOrder?.items ?? [],
+    });
+  });
+
+  return Array.from(ordersById.values()).sort((a, b) => (
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  ));
+};
+
 const MyOrders = () => {
   const { customer, isCustomerLoading } = useCustomerAuth();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
@@ -61,18 +94,10 @@ const MyOrders = () => {
     setLoading(true);
 
     const loadOrders = async () => {
+      const localOrders = localOrdersForCustomer(customer.id, customer.telefone);
+
       if (!supabase || !isSupabaseConfigured) {
-        return loadLocalOrders()
-          .filter(order => order.customerId === customer.id || order.customerWhatsapp === customer.telefone)
-          .map(order => ({
-            id: order.id,
-            createdAt: order.createdAt,
-            total: order.total,
-            status: order.status,
-            paymentMethod: order.paymentMethod,
-            paymentStatus: order.paymentStatus,
-            items: order.items,
-          }));
+        return localOrders;
       }
 
       const result = await supabase
@@ -91,13 +116,13 @@ const MyOrders = () => {
             .order("criado_em", { ascending: false });
 
           if (legacyResult.error) throw legacyResult.error;
-          return mapOrderRows(legacyResult.data ?? []);
+          return mergeOrders(mapOrderRows(legacyResult.data ?? []), localOrders);
         }
 
         throw result.error;
       }
 
-      return mapOrderRows(result.data ?? []);
+      return mergeOrders(mapOrderRows(result.data ?? []), localOrders);
     };
 
     loadOrders()
@@ -106,7 +131,7 @@ const MyOrders = () => {
       })
       .catch(error => {
         console.error("Erro ao carregar pedidos do cliente:", error);
-        if (isMounted) setOrders([]);
+        if (isMounted) setOrders(localOrdersForCustomer(customer.id, customer.telefone));
       })
       .finally(() => {
         if (isMounted) setLoading(false);
