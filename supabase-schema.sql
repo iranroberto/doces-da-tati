@@ -75,6 +75,17 @@ create table if not exists public.pagamentos (
   criado_em timestamptz not null default now()
 );
 
+create table if not exists public.product_ratings (
+  id uuid primary key default gen_random_uuid(),
+  pedido_id uuid references public.pedidos(id) on delete cascade,
+  produto_id text not null references public.products(id) on delete cascade,
+  cliente_id uuid references public.clientes(id) on delete cascade,
+  nota integer not null check (nota between 1 and 5),
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now(),
+  unique (pedido_id, produto_id, cliente_id)
+);
+
 create table if not exists public.mercado_pago_settings (
   id text primary key default 'main',
   access_token text not null default '',
@@ -124,6 +135,7 @@ alter table public.categories enable row level security;
 alter table public.clientes enable row level security;
 alter table public.pedidos enable row level security;
 alter table public.pagamentos enable row level security;
+alter table public.product_ratings enable row level security;
 alter table public.mercado_pago_settings enable row level security;
 
 grant usage on schema public to anon, authenticated;
@@ -133,6 +145,7 @@ grant select, insert, update, delete on public.categories to anon, authenticated
 grant select, insert, update, delete on public.clientes to anon, authenticated;
 grant select, insert, update, delete on public.pedidos to anon, authenticated;
 grant select, insert, update, delete on public.pagamentos to anon, authenticated;
+grant select, insert, update, delete on public.product_ratings to anon, authenticated;
 revoke all on public.mercado_pago_settings from anon, authenticated;
 
 drop policy if exists "Public can read store config" on public.store_config;
@@ -147,6 +160,8 @@ drop policy if exists "Public can read orders" on public.pedidos;
 drop policy if exists "Public can write orders" on public.pedidos;
 drop policy if exists "Public can read payments" on public.pagamentos;
 drop policy if exists "Public can write payments" on public.pagamentos;
+drop policy if exists "Public can read product ratings" on public.product_ratings;
+drop policy if exists "Public can write product ratings" on public.product_ratings;
 
 create policy "Public can read store config"
   on public.store_config for select
@@ -199,6 +214,15 @@ create policy "Public can read payments"
 
 create policy "Public can write payments"
   on public.pagamentos for all
+  using (true)
+  with check (true);
+
+create policy "Public can read product ratings"
+  on public.product_ratings for select
+  using (true);
+
+create policy "Public can write product ratings"
+  on public.product_ratings for all
   using (true)
   with check (true);
 

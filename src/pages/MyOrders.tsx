@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Clock, Package, ReceiptText, Truck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Package, ReceiptText, Star, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
+import { getLocalRating, saveProductRating } from "@/lib/ratings";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 
@@ -79,6 +81,8 @@ const mergeOrders = (remoteOrders: CustomerOrder[], localOrders: CustomerOrder[]
 const MyOrders = () => {
   const { customer, isCustomerLoading } = useCustomerAuth();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [savingRatingKey, setSavingRatingKey] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -127,7 +131,17 @@ const MyOrders = () => {
 
     loadOrders()
       .then(nextOrders => {
-        if (isMounted) setOrders(nextOrders);
+        if (!isMounted) return;
+
+        setOrders(nextOrders);
+        const nextRatings: Record<string, number> = {};
+        nextOrders.forEach(order => {
+          order.items.forEach(item => {
+            const localRating = getLocalRating(order.id, item.productId, customer.id);
+            if (localRating) nextRatings[`${order.id}:${item.productId}`] = localRating.rating;
+          });
+        });
+        setRatings(nextRatings);
       })
       .catch(error => {
         console.error("Erro ao carregar pedidos do cliente:", error);
@@ -146,6 +160,30 @@ const MyOrders = () => {
     paid: orders.filter(order => order.paymentStatus === "aprovado").length,
     delivered: orders.filter(order => order.status === "entregue").length,
   }), [orders]);
+
+  const handleRateProduct = async (order: CustomerOrder, item: OrderItemDraft, rating: number) => {
+    if (!customer) return;
+
+    const ratingKey = `${order.id}:${item.productId}`;
+    setSavingRatingKey(ratingKey);
+
+    try {
+      await saveProductRating({
+        orderId: order.id,
+        productId: item.productId,
+        customerId: customer.id,
+        rating,
+      });
+
+      setRatings(current => ({ ...current, [ratingKey]: rating }));
+      toast.success("Avaliacao salva. Obrigado!");
+    } catch (error) {
+      console.error("Erro ao salvar avaliacao:", error);
+      toast.error("Nao foi possivel salvar sua avaliacao.");
+    } finally {
+      setSavingRatingKey("");
+    }
+  };
 
   if (!customer && !isCustomerLoading) {
     return (
@@ -219,12 +257,44 @@ const MyOrders = () => {
                     <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Itens</p>
                     {order.items.length > 0 ? (
                       <div className="space-y-2">
-                        {order.items.map((item, index) => (
-                          <div key={`${order.id}-${item.productId}-${index}`} className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm">
-                            <span>{item.quantity}x {item.name}</span>
-                            <span className="font-bold">{formatPrice(item.price * item.quantity)}</span>
+                        {order.items.map((item, index) => {
+                          const ratingKey = `${order.id}:${item.productId}`;
+                          const currentRating = ratings[ratingKey] ?? 0;
+                          const canRate = order.status === "entregue";
+
+                          return (
+                          <div key={`${order.id}-${item.productId}-${index}`} className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+                            <div className="flex items-center justify-between gap-3">
+                              <span>{item.quantity}x {item.name}</span>
+                              <span className="font-bold">{formatPrice(item.price * item.quantity)}</span>
+                            </div>
+                            {canRate && (
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-bold uppercase text-muted-foreground">Avaliar</span>
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 5 }).map((_, starIndex) => {
+                                    const starValue = starIndex + 1;
+
+                                    return (
+                                      <button
+                                        key={starValue}
+                                        type="button"
+                                        className="text-primary transition hover:scale-110 disabled:opacity-60"
+                                        disabled={savingRatingKey === ratingKey}
+                                        onClick={() => void handleRateProduct(order, item, starValue)}
+                                        aria-label={`Avaliar ${item.name} com ${starValue} estrelas`}
+                                      >
+                                        <Star className={starValue <= currentRating ? "h-5 w-5 fill-current" : "h-5 w-5 text-muted-foreground/40"} />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                {currentRating > 0 && <span className="text-xs font-semibold text-muted-foreground">{currentRating}/5</span>}
+                              </div>
+                            )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">Itens nao registrados neste pedido.</p>

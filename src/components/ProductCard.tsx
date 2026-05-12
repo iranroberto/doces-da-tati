@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
 import { Package, ShoppingCart, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
 import { getProductPrice, hasPromotionalPrice } from "@/lib/pricing";
+import { getProductRatingSummary, type ProductRatingSummary } from "@/lib/ratings";
 import { Button } from "@/components/ui/button";
 
 const formatPrice = (value: number) =>
@@ -10,12 +12,29 @@ const formatPrice = (value: number) =>
 
 const ProductCard = ({ product }: { product: Product }) => {
   const { addToCart, cart, categories } = useStore();
+  const [ratingSummary, setRatingSummary] = useState<ProductRatingSummary>({ average: 0, count: 0 });
   const isSoldOut = product.stock === 0;
   const category = categories.find(item => item.id === product.categoryId);
   const cartItem = cart.find(item => item.product.id === product.id);
   const cartQuantity = cartItem?.quantity ?? 0;
   const productPrice = getProductPrice(product);
   const showPromotionalPrice = hasPromotionalPrice(product);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getProductRatingSummary(product.id)
+      .then(summary => {
+        if (isMounted) setRatingSummary(summary);
+      })
+      .catch(error => {
+        console.error("Erro ao carregar avaliacao do produto:", error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [product.id]);
 
   const handleBuy = () => {
     if (cartQuantity >= product.stock) {
@@ -59,6 +78,19 @@ const ProductCard = ({ product }: { product: Product }) => {
             <p className="mb-1 text-xs font-bold uppercase tracking-wide text-primary">{category.name}</p>
           )}
           <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-tight text-card-foreground sm:min-h-14 sm:text-lg">{product.name}</h3>
+          <div className="mt-1 flex items-center gap-1 text-xs font-bold text-primary">
+            <span className="flex items-center gap-0.5" aria-label={`Media ${ratingSummary.average.toFixed(1)} de 5 estrelas`}>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Star
+                  key={index}
+                  className={index < Math.round(ratingSummary.average) ? "h-3.5 w-3.5 fill-current" : "h-3.5 w-3.5 text-muted-foreground/40"}
+                />
+              ))}
+            </span>
+            <span className="text-muted-foreground">
+              {ratingSummary.count ? `${ratingSummary.average.toFixed(1)} (${ratingSummary.count})` : "Sem avaliacoes"}
+            </span>
+          </div>
           <p className="mt-1 line-clamp-2 min-h-9 text-xs text-muted-foreground sm:min-h-10 sm:text-sm">{product.description}</p>
         </div>
 
