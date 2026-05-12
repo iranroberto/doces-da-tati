@@ -20,14 +20,25 @@ const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
 
   return (
     <header
-      className="sticky top-0 z-40 border-b border-primary-foreground/15 bg-primary bg-cover text-primary-foreground shadow-lg"
+      className="sticky top-0 z-40 overflow-hidden border-b border-primary-foreground/15 bg-primary text-primary-foreground shadow-lg"
       style={hasBanner ? {
-        backgroundImage: `linear-gradient(90deg, hsl(var(--primary) / 0.82), hsl(var(--primary) / 0.54)), url(${config.bannerImage})`,
-        backgroundPosition: `${config.bannerPositionX}% ${config.bannerPositionY}%`,
         minHeight: `${config.bannerHeight}px`,
       } : undefined}
     >
-      <div className={hasBanner ? "container mx-auto flex min-h-[inherit] items-center justify-between px-4 py-6" : "container mx-auto flex items-center justify-between px-4 py-5"}>
+      {hasBanner && (
+        <>
+          <img
+            src={config.bannerImage}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: `${config.bannerPositionX}% ${config.bannerPositionY}%` }}
+          />
+          <div className="absolute inset-0 bg-primary/60" />
+        </>
+      )}
+
+      <div className={hasBanner ? "container relative mx-auto flex min-h-[inherit] items-center justify-between px-4 py-6" : "container relative mx-auto flex items-center justify-between px-4 py-5"}>
         <Link to="/" className="flex min-w-0 items-center gap-4 md:gap-5">
           {config.logo ? (
             <img src={config.logo} alt={config.name} className="h-24 w-24 rounded-full border-4 border-primary-foreground bg-primary-foreground object-cover shadow-xl md:h-32 md:w-32" />
