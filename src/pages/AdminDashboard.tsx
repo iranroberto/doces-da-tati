@@ -73,6 +73,30 @@ const saveLocalCustomers = (customers: Customer[]) => {
   localStorage.setItem(LOCAL_CUSTOMERS_KEY, JSON.stringify(customers));
 };
 
+const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
+  const localOrdersById = new Map(loadLocalOrders().map(order => [order.id, order]));
+
+  return rows.map(row => {
+    const id = String(row.id);
+    const localOrder = localOrdersById.get(id);
+    const customer = row.clientes as { nome?: unknown } | Array<{ nome?: unknown }> | undefined;
+    const customerName = Array.isArray(customer)
+      ? String(customer[0]?.nome ?? "")
+      : String(customer?.nome ?? "");
+
+    return {
+      id,
+      createdAt: String(row.criado_em ?? ""),
+      customerName: customerName || localOrder?.customerName || "Cliente",
+      total: Number(row.total ?? 0),
+      status: String(row.status ?? "aberto"),
+      paymentMethod: String(row.forma_pagamento ?? localOrder?.paymentMethod ?? "pix"),
+      paymentStatus: normalizePaymentStatus(row.status_pagamento ?? localOrder?.paymentStatus),
+      transactionId: String(row.transaction_id ?? localOrder?.transactionId ?? ""),
+    };
+  });
+};
+
 const customerFromRow = (row: Record<string, unknown>): Customer => ({
   id: String(row.id),
   nome: String(row.nome ?? ""),
@@ -304,10 +328,10 @@ const AdminDashboard = () => {
   }, [dialogOpen, editingProduct, pCategoryId, pDesc, pImage, pName, pPrice, pPromo, pPromotionalPrice, pStock, products, setProducts]);
 
   useEffect(() => {
-    if (tab !== "clients") return;
+    if (tab !== "clients" && tab !== "dashboard") return;
 
     let isMounted = true;
-    setCustomersLoading(true);
+    if (tab === "clients") setCustomersLoading(true);
 
     const loadCustomers = async () => {
       try {
@@ -332,9 +356,9 @@ const AdminDashboard = () => {
         setCustomers((data ?? []).map(customerFromRow));
       } catch (error) {
         console.error("Erro ao carregar clientes:", error);
-        toast.error("Nao foi possivel carregar clientes.");
+        if (tab === "clients") toast.error("Nao foi possivel carregar clientes.");
       } finally {
-        if (isMounted) setCustomersLoading(false);
+        if (isMounted && tab === "clients") setCustomersLoading(false);
       }
     };
 
@@ -346,10 +370,10 @@ const AdminDashboard = () => {
   }, [tab]);
 
   useEffect(() => {
-    if (tab !== "orders") return;
+    if (tab !== "orders" && tab !== "dashboard") return;
 
     let isMounted = true;
-    setOrdersLoading(true);
+    if (tab === "orders") setOrdersLoading(true);
 
     const loadOrders = async () => {
       try {
@@ -383,32 +407,12 @@ const AdminDashboard = () => {
         if (error) throw error;
         if (!isMounted) return;
 
-        const localOrdersById = new Map(loadLocalOrders().map(order => [order.id, order]));
-
-        setOrders((data ?? []).map(row => {
-          const id = String(row.id);
-          const localOrder = localOrdersById.get(id);
-          const customer = row.clientes;
-          const customerName = Array.isArray(customer)
-            ? String(customer[0]?.nome ?? "")
-            : String(customer?.nome ?? "");
-
-          return {
-            id,
-            createdAt: String(row.criado_em ?? ""),
-            customerName: customerName || localOrder?.customerName || "Cliente",
-            total: Number(row.total ?? 0),
-            status: String(row.status ?? "aberto"),
-            paymentMethod: String(row.forma_pagamento ?? localOrder?.paymentMethod ?? "pix"),
-            paymentStatus: normalizePaymentStatus(row.status_pagamento ?? localOrder?.paymentStatus),
-            transactionId: String(row.transaction_id ?? localOrder?.transactionId ?? ""),
-          };
-        }));
+        setOrders(mapOrderRows(data ?? []));
       } catch (error) {
         console.error("Erro ao carregar pedidos:", error);
-        toast.error("Nao foi possivel carregar pedidos.");
+        if (tab === "orders") toast.error("Nao foi possivel carregar pedidos.");
       } finally {
-        if (isMounted) setOrdersLoading(false);
+        if (isMounted && tab === "orders") setOrdersLoading(false);
       }
     };
 
@@ -436,6 +440,25 @@ const AdminDashboard = () => {
       return latestB - latestA;
     });
   }, [orders]);
+
+  const todaysOrders = useMemo(() => {
+    const today = new Date();
+    return orders.filter(order => {
+      const createdAt = new Date(order.createdAt);
+      return !Number.isNaN(createdAt.getTime())
+        && createdAt.getFullYear() === today.getFullYear()
+        && createdAt.getMonth() === today.getMonth()
+        && createdAt.getDate() === today.getDate();
+    });
+  }, [orders]);
+
+  const approvedRevenue = useMemo(() => (
+    orders
+      .filter(order => order.paymentStatus === "aprovado")
+      .reduce((sum, order) => sum + order.total, 0)
+  ), [orders]);
+
+  const recentOrders = orders.slice(0, 5);
 
   if (!isAdmin) {
     navigate("/admin");
@@ -727,8 +750,8 @@ const AdminDashboard = () => {
   };
 
   const dashboardCards = [
-    { label: "Pedidos hoje", value: String(orders.length), icon: ClipboardList },
-    { label: "Faturamento", value: formatPrice(0), icon: DollarSign },
+    { label: "Pedidos hoje", value: String(todaysOrders.length), icon: ClipboardList },
+    { label: "Faturamento", value: formatPrice(approvedRevenue), icon: DollarSign },
     { label: "Clientes", value: String(customers.length), icon: Users },
   ];
 
@@ -804,14 +827,29 @@ const AdminDashboard = () => {
 
             <div className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
               <div className="grid grid-cols-4 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
-                <span>Pedido</span>
+                <span>Data</span>
                 <span>Cliente</span>
                 <span>Total</span>
                 <span>Status</span>
               </div>
-              <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
-                Nenhum pedido ainda
-              </div>
+              {recentOrders.length === 0 ? (
+                <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
+                  Nenhum pedido ainda
+                </div>
+              ) : (
+                <div className="divide-y divide-[#603000]">
+                  {recentOrders.map(order => (
+                    <div key={order.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-4 md:gap-4">
+                      <span className="font-bold">{formatDateTime(order.createdAt)}</span>
+                      <span>{order.customerName}</span>
+                      <span className="font-bold text-[#f0d8a8]">{formatPrice(order.total)}</span>
+                      <span className={order.status === "entregue" ? "font-bold text-green-300" : "font-bold text-yellow-200"}>
+                        {order.status === "entregue" ? "Entregue" : "Pendente"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
