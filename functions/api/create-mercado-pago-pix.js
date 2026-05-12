@@ -31,14 +31,16 @@ export const onRequestPost = async ({ request, env }) => {
     const total = Number(body.total || 0);
     const customerName = String(body.customerName || "Cliente");
     const storeName = String(body.storeName || env.STORE_NAME || "Loja");
-    const payerEmail = String(body.customerEmail || "").trim();
+    const payerEmail = String(body.customerEmail || env.MERCADO_PAGO_DEFAULT_PAYER_EMAIL || "").trim();
 
     if (!orderId || !total || total <= 0) {
       return json({ error: "Dados invalidos para criar PIX." }, 400);
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
-      return json({ error: "Informe um e-mail valido do cliente para gerar o Pix." }, 400);
+      return json({
+        error: "Configure MERCADO_PAGO_DEFAULT_PAYER_EMAIL no Cloudflare para gerar Pix sem pedir e-mail ao cliente.",
+      }, 400);
     }
 
     const response = await fetch("https://api.mercadopago.com/v1/payments", {
