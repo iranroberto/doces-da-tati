@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Banknote, CheckCircle2, Copy, CreditCard, Heart, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -118,7 +118,7 @@ const Checkout = () => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pendente");
   const [isProcessing, setIsProcessing] = useState(false);
   const [pixPayment, setPixPayment] = useState<PixPayment | null>(null);
-  const [thankYouToastShown, setThankYouToastShown] = useState(false);
+  const thankYouToastShown = useRef(false);
 
   useEffect(() => {
     const savedOrder = loadPendingCheckout();
@@ -185,7 +185,7 @@ const Checkout = () => {
 
     if (!paymentId || !orderId) return;
 
-    setIsProcessing(true);
+    if (showSuccessToast) setIsProcessing(true);
     try {
       const response = await fetch(`/api/get-mercado-pago-payment?payment_id=${encodeURIComponent(paymentId)}&order_id=${encodeURIComponent(orderId)}`);
       const result = await readApiJson(response);
@@ -218,9 +218,7 @@ const Checkout = () => {
         toast.error(error instanceof Error ? error.message : "Nao foi possivel verificar o Pix.");
       }
     } finally {
-      if (showSuccessToast) {
-        setIsProcessing(false);
-      }
+      if (showSuccessToast) setIsProcessing(false);
     }
   }, [order?.registeredOrderId, order?.transactionId, pixPayment?.paymentId]);
 
@@ -236,16 +234,20 @@ const Checkout = () => {
   }, [checkPixPayment, order?.registeredOrderId, paymentStatus, pixPayment?.paymentId, selectedPaymentMethod]);
 
   useEffect(() => {
-    if (paymentStatus !== "aprovado" || thankYouToastShown) return;
+    if (paymentStatus !== "aprovado") return;
 
-    toast.success("Pagamento confirmado. Obrigado pelo pedido!");
-    setThankYouToastShown(true);
+    if (!thankYouToastShown.current) {
+      toast.success("Pagamento confirmado. Obrigado pelo pedido!");
+      thankYouToastShown.current = true;
+    }
+
+    setIsProcessing(false);
     const timeout = window.setTimeout(() => {
       navigate("/meus-pedidos");
-    }, 2800);
+    }, 1800);
 
     return () => window.clearTimeout(timeout);
-  }, [navigate, paymentStatus, thankYouToastShown]);
+  }, [navigate, paymentStatus]);
 
   useEffect(() => {
     if (!order || order.items.length === 0 || order.registeredOrderId) return;
