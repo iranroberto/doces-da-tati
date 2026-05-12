@@ -370,6 +370,7 @@ const AdminDashboard = () => {
         ...config,
         name: storeName.trim(),
         whatsapp,
+        logo: config.logo,
         pixKey: pixKey.trim(),
         pixReceiverName: pixReceiverName.trim() || "DOCES DA TATI",
         pixCity: pixCity.trim() || "RIO DE JANEIRO",

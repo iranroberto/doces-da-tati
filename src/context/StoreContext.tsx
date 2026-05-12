@@ -142,7 +142,6 @@ function saveLocal<T>(key: string, value: T) {
 
 const configForLocalStorage = (config: StoreConfig): StoreConfig => ({
   ...config,
-  logo: config.logo.startsWith("data:") ? "" : config.logo,
 });
 
 const parseBannerConfig = (banner: unknown): Partial<StoreConfig> => {
