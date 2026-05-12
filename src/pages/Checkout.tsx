@@ -28,7 +28,7 @@ interface PendingCheckout {
 }
 
 const paymentOptions: Array<{ id: PaymentMethod; label: string; description: string; icon: typeof QrCode }> = [
-  { id: "pix", label: "PIX", description: "", icon: QrCode },
+  { id: "pix", label: "Pagamento via Pix", description: "", icon: QrCode },
   { id: "dinheiro", label: "Dinheiro", description: "Pagamento combinado na entrega", icon: Banknote },
   { id: "credito", label: "Credito", description: "Cartao via Mercado Pago", icon: CreditCard },
   { id: "debito", label: "Debito", description: "Cartao via Mercado Pago", icon: CreditCard },
