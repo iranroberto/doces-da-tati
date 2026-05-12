@@ -68,7 +68,7 @@ export const onRequestPost = async ({ request, env }) => {
         pending: `${siteUrl}/#/checkout?mp_result=pending&order_id=${encodeURIComponent(orderId)}`,
       },
       auto_return: "approved",
-      notification_url: env.MERCADO_PAGO_WEBHOOK_URL || `${siteUrl}/api/mercado-pago-webhook`,
+      notification_url: env.MERCADO_PAGO_WEBHOOK_URL || `${siteUrl}/api/webhooks/mercadopago`,
       statement_descriptor: "DOCES DA TATI",
     };
 

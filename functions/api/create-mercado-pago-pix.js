@@ -50,7 +50,7 @@ export const onRequestPost = async ({ request, env }) => {
     const payerEmail = String(
       body.customerEmail || env.MERCADO_PAGO_DEFAULT_PAYER_EMAIL || buildFallbackPayerEmail(orderId)
     ).trim();
-    const notificationUrl = env.MERCADO_PAGO_WEBHOOK_URL || `${getSiteUrl(request, env)}/api/mercado-pago-webhook`;
+    const notificationUrl = env.MERCADO_PAGO_WEBHOOK_URL || `${getSiteUrl(request, env)}/api/webhooks/mercadopago`;
 
     if (!orderId || !total || total <= 0) {
       return json({ error: "Dados invalidos para criar PIX." }, 400);
