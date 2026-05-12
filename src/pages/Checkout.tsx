@@ -88,6 +88,17 @@ const savePendingCheckout = (order: PendingCheckout) => {
   localStorage.setItem("pending_checkout", JSON.stringify(order));
 };
 
+const readApiJson = async (response: Response) => {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text };
+  }
+};
+
 const getMercadoPagoReturnParams = () => {
   const query = window.location.hash.split("?")[1] || window.location.search.slice(1);
   return new URLSearchParams(query);
@@ -133,7 +144,7 @@ const Checkout = () => {
 
     setIsProcessing(true);
     fetch(`/api/get-mercado-pago-payment?payment_id=${encodeURIComponent(paymentId)}&order_id=${encodeURIComponent(orderId)}`)
-      .then(response => response.json())
+      .then(response => readApiJson(response))
       .then(async result => {
         const nextStatus = (result.status || fallbackStatus) as PaymentStatus;
         setPaymentStatus(nextStatus);
@@ -169,7 +180,7 @@ const Checkout = () => {
     setIsProcessing(true);
     try {
       const response = await fetch(`/api/get-mercado-pago-payment?payment_id=${encodeURIComponent(paymentId)}&order_id=${encodeURIComponent(orderId)}`);
-      const result = await response.json();
+      const result = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(result.error || "Nao foi possivel verificar o Pix.");
@@ -366,7 +377,7 @@ const Checkout = () => {
           storeName: config.name,
         }),
       });
-      const result = await response.json();
+      const result = await readApiJson(response);
 
       if (!response.ok || !result.qrCode) {
         throw new Error(result.error || "Nao foi possivel gerar o Pix.");

@@ -2,6 +2,17 @@ import { corsHeaders, json, updateSupabaseOrderPayment } from "../_shared.js";
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders });
 
+const readJson = async (response) => {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+};
+
 export const onRequestPost = async ({ request, env }) => {
   const accessToken = env.MERCADO_PAGO_ACCESS_TOKEN;
   if (!accessToken) return json({ error: "MERCADO_PAGO_ACCESS_TOKEN nao configurado." }, 500);
@@ -38,13 +49,24 @@ export const onRequestPost = async ({ request, env }) => {
         notification_url: env.MERCADO_PAGO_WEBHOOK_URL,
       }),
     });
-    const result = await response.json();
+    const result = await readJson(response);
 
     if (!response.ok) {
-      return json({ error: result.message || "Erro ao gerar PIX Mercado Pago.", details: result }, response.status);
+      return json({
+        error: result.message || result.error || "Nao foi possivel gerar o Pix no Mercado Pago.",
+        details: result,
+      }, response.status);
     }
 
     const transactionData = result.point_of_interaction?.transaction_data || {};
+    const qrCode = transactionData.qr_code || "";
+
+    if (!qrCode) {
+      return json({
+        error: "Mercado Pago nao retornou o Pix copia e cola. Tente gerar novamente.",
+        details: result,
+      }, 502);
+    }
 
     await updateSupabaseOrderPayment(env, {
       orderId,
@@ -57,7 +79,7 @@ export const onRequestPost = async ({ request, env }) => {
     return json({
       paymentId: String(result.id),
       status: result.status,
-      qrCode: transactionData.qr_code || "",
+      qrCode,
       qrCodeBase64: transactionData.qr_code_base64 || "",
       ticketUrl: transactionData.ticket_url || "",
     });
