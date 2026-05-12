@@ -28,7 +28,7 @@ interface PendingCheckout {
 }
 
 const paymentOptions: Array<{ id: PaymentMethod; label: string; description: string; icon: typeof QrCode }> = [
-  { id: "pix", label: "PIX", description: "PIX com confirmacao Mercado Pago", icon: QrCode },
+  { id: "pix", label: "PIX", description: "", icon: QrCode },
   { id: "dinheiro", label: "Dinheiro", description: "Pagamento combinado na entrega", icon: Banknote },
   { id: "credito", label: "Credito", description: "Cartao via Mercado Pago", icon: CreditCard },
   { id: "debito", label: "Debito", description: "Cartao via Mercado Pago", icon: CreditCard },
@@ -382,15 +382,6 @@ const Checkout = () => {
             </div>
           </div>
 
-          {selectedPaymentMethod === "pix" && (
-            <div className="space-y-2 rounded-lg border border-border bg-muted/50 p-3">
-              <p className="text-sm font-bold">PIX Mercado Pago</p>
-              <p className="text-sm text-muted-foreground">
-                Gere o PIX pelo Mercado Pago para o sistema confirmar automaticamente quando o pagamento for aprovado.
-              </p>
-            </div>
-          )}
-
           {selectedPaymentMethod === "dinheiro" && (
             <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
               O pedido sera registrado como pagamento pendente para acerto na entrega.
@@ -416,7 +407,7 @@ const Checkout = () => {
           {isMercadoPagoPayment ? (
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void startMercadoPagoPayment()}>
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : selectedPaymentMethod === "pix" ? <QrCode className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
-              {selectedPaymentMethod === "pix" ? "Gerar PIX Mercado Pago" : "Pagar com Mercado Pago"}
+              {selectedPaymentMethod === "pix" ? "Gerar PIX" : "Pagar com Mercado Pago"}
             </Button>
           ) : (
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void confirmManualPayment()}>
