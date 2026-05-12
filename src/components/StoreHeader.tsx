@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { CakeSlice, LogOut, ReceiptText, ShoppingCart, UserRound } from "lucide-react";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useStore } from "@/context/StoreContext";
@@ -12,6 +13,7 @@ interface StoreHeaderProps {
 const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
   const { config, cartCount } = useStore();
   const { customer, logoutCustomer } = useCustomerAuth();
+  const navigate = useNavigate();
   const match = config.name.match(/^(.*?)(vizio)$/i);
   const prefixName = match?.[1]?.trim();
   const scriptName = match?.[2] || config.name;
@@ -39,7 +41,14 @@ const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
       )}
 
       <div className={hasBanner ? "container relative mx-auto flex min-h-[inherit] items-center justify-between px-4 py-6" : "container relative mx-auto flex items-center justify-between px-4 py-5"}>
-        <Link to="/" className="flex min-w-0 items-center gap-4 md:gap-5">
+        <Link
+          to="/"
+          className="flex min-w-0 items-center gap-4 md:gap-5"
+          onDoubleClick={event => {
+            event.preventDefault();
+            navigate("/admin");
+          }}
+        >
           {config.logo ? (
             <img src={config.logo} alt={config.name} className="h-24 w-24 rounded-full border-4 border-primary-foreground bg-primary-foreground object-cover shadow-xl md:h-32 md:w-32" />
           ) : (

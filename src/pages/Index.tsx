@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { Instagram, PackageCheck, Search } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
 import CartDrawer from "@/components/CartDrawer";
@@ -163,9 +162,6 @@ const Index = () => {
             <Instagram className="h-5 w-5" />
           </a>
         )}
-        <Link to="/admin" className="text-xs font-medium text-muted-foreground/80 hover:text-primary">
-          Acesso restrito
-        </Link>
       </footer>
 
     </div>
