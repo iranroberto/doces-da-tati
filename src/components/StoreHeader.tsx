@@ -16,6 +16,7 @@ const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
   const prefixName = match?.[1]?.trim();
   const scriptName = match?.[2] || config.name;
   const hasBanner = config.showBanner && config.bannerImage;
+  const customerName = customer?.nome.trim() || "Cliente";
 
   return (
     <header
@@ -54,15 +55,16 @@ const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
         <div className="flex items-center gap-2">
           {customer ? (
             <>
-              <div className="hidden items-center gap-2 rounded-full bg-primary-foreground/12 px-3 py-2 text-sm font-bold sm:flex">
+              <div className="hidden max-w-[260px] items-center gap-2 rounded-full bg-primary-foreground/12 px-3 py-2 text-sm font-bold sm:flex">
                 <UserRound className="h-4 w-4" />
-                <span className="max-w-32 truncate">{customer.nome.split(" ")[0] || customer.nome}</span>
+                <span className="min-w-0 truncate">Seja bem-vindo, {customerName}</span>
                 <button className="text-primary-foreground/80 hover:text-primary-foreground" onClick={logoutCustomer} aria-label="Sair da conta">
                   <LogOut className="h-4 w-4" />
                 </button>
               </div>
-              <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20 sm:hidden" onClick={logoutCustomer} aria-label="Sair da conta">
+              <Button variant="ghost" className="max-w-36 gap-2 px-2 text-primary-foreground hover:bg-primary-foreground/20 sm:hidden" onClick={logoutCustomer} aria-label="Sair da conta">
                 <UserRound className="h-5 w-5" />
+                <span className="min-w-0 truncate text-xs font-bold">{customerName.split(" ")[0] || customerName}</span>
               </Button>
             </>
           ) : (
