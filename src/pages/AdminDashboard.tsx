@@ -1071,6 +1071,9 @@ const AdminDashboard = () => {
                     Tamanho recomendado: {BANNER_RECOMMENDED_WIDTH} x {BANNER_RECOMMENDED_HEIGHT}px. Deixe o conteudo principal centralizado para nao cortar no celular.
                   </p>
                   <Input type="file" accept="image/*" onChange={handleBannerUpload} />
+                  <p className="mt-2 text-xs font-semibold text-muted-foreground">
+                    Depois de escolher a imagem ou ajustar a posicao, clique em Salvar banner.
+                  </p>
                 </div>
 
                 {bannerImage && (
@@ -1137,9 +1140,14 @@ const AdminDashboard = () => {
                       />
                     </div>
 
-                    <Button variant="outline" className="gap-2 text-destructive" onClick={removeBanner}>
-                      <Trash2 className="h-4 w-4" /> Remover banner
-                    </Button>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Button className="gap-2" onClick={saveStoreSettings}>
+                        <Save className="h-4 w-4" /> Salvar banner
+                      </Button>
+                      <Button variant="outline" className="gap-2 text-destructive" onClick={removeBanner}>
+                        <Trash2 className="h-4 w-4" /> Remover banner
+                      </Button>
+                    </div>
                   </>
                 )}
               </CardContent>
