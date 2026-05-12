@@ -1,0 +1,68 @@
+import { corsHeaders, json, updateSupabaseOrderPayment } from "../_shared.js";
+
+export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders });
+
+export const onRequestPost = async ({ request, env }) => {
+  const accessToken = env.MERCADO_PAGO_ACCESS_TOKEN;
+  if (!accessToken) return json({ error: "MERCADO_PAGO_ACCESS_TOKEN nao configurado." }, 500);
+
+  try {
+    const body = await request.json();
+    const orderId = String(body.orderId || "");
+    const total = Number(body.total || 0);
+    const customerName = String(body.customerName || "Cliente");
+    const payerEmail = String(body.customerEmail || env.MERCADO_PAGO_DEFAULT_PAYER_EMAIL || "cliente@docesdatati.com.br");
+
+    if (!orderId || !total || total <= 0) {
+      return json({ error: "Dados invalidos para criar PIX." }, 400);
+    }
+
+    const response = await fetch("https://api.mercadopago.com/v1/payments", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": `pix-${orderId}`,
+      },
+      body: JSON.stringify({
+        transaction_amount: total,
+        description: `Pedido Doces da Tati - ${customerName}`,
+        payment_method_id: "pix",
+        external_reference: orderId,
+        payer: {
+          email: payerEmail,
+          first_name: customerName.split(" ")[0] || "Cliente",
+          last_name: customerName.split(" ").slice(1).join(" ") || "Doces da Tati",
+        },
+        notification_url: env.MERCADO_PAGO_WEBHOOK_URL,
+      }),
+    });
+    const result = await response.json();
+
+    if (!response.ok) {
+      return json({ error: result.message || "Erro ao gerar PIX Mercado Pago.", details: result }, response.status);
+    }
+
+    const transactionData = result.point_of_interaction?.transaction_data || {};
+
+    await updateSupabaseOrderPayment(env, {
+      orderId,
+      paymentMethod: "pix",
+      paymentStatus: "pendente",
+      transactionId: String(result.id || ""),
+      paidAt: null,
+    });
+
+    return json({
+      paymentId: String(result.id),
+      status: result.status,
+      qrCode: transactionData.qr_code || "",
+      qrCodeBase64: transactionData.qr_code_base64 || "",
+      ticketUrl: transactionData.ticket_url || "",
+    });
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Erro inesperado." }, 500);
+  }
+};
+
+export const onRequest = ({ request }) => json({ error: `Metodo ${request.method} nao permitido.` }, 405);

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Banknote, CheckCircle2, Copy, CreditCard, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
@@ -25,6 +25,16 @@ interface PendingCheckout {
   transactionId?: string;
   paidAt?: string;
   registeredOrderId?: string;
+  pixQrCode?: string;
+  pixQrCodeBase64?: string;
+  pixTicketUrl?: string;
+}
+
+interface PixPayment {
+  paymentId: string;
+  qrCode: string;
+  qrCodeBase64: string;
+  ticketUrl: string;
 }
 
 const paymentOptions: Array<{ id: PaymentMethod; label: string; description: string; icon: typeof QrCode }> = [
@@ -65,6 +75,9 @@ const loadPendingCheckout = (): PendingCheckout | null => {
       transactionId: value.transactionId ? String(value.transactionId) : undefined,
       paidAt: value.paidAt ? String(value.paidAt) : undefined,
       registeredOrderId: value.registeredOrderId ? String(value.registeredOrderId) : undefined,
+      pixQrCode: value.pixQrCode ? String(value.pixQrCode) : undefined,
+      pixQrCodeBase64: value.pixQrCodeBase64 ? String(value.pixQrCodeBase64) : undefined,
+      pixTicketUrl: value.pixTicketUrl ? String(value.pixTicketUrl) : undefined,
     };
   } catch {
     return null;
@@ -86,6 +99,7 @@ const Checkout = () => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("pix");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pendente");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pixPayment, setPixPayment] = useState<PixPayment | null>(null);
 
   useEffect(() => {
     const savedOrder = loadPendingCheckout();
@@ -97,6 +111,15 @@ const Checkout = () => {
 
     if (savedOrder?.paymentStatus) {
       setPaymentStatus(savedOrder.paymentStatus);
+    }
+
+    if (savedOrder?.transactionId && savedOrder.paymentMethod === "pix") {
+      setPixPayment({
+        paymentId: savedOrder.transactionId,
+        qrCode: savedOrder.pixQrCode || "",
+        qrCodeBase64: savedOrder.pixQrCodeBase64 || "",
+        ticketUrl: savedOrder.pixTicketUrl || "",
+      });
     }
   }, []);
 
@@ -136,6 +159,64 @@ const Checkout = () => {
       })
       .finally(() => setIsProcessing(false));
   }, [order?.registeredOrderId, selectedPaymentMethod]);
+
+  const checkPixPayment = useCallback(async (showSuccessToast = true) => {
+    const paymentId = pixPayment?.paymentId || order?.transactionId;
+    const orderId = order?.registeredOrderId;
+
+    if (!paymentId || !orderId) return;
+
+    if (showSuccessToast) {
+      setIsProcessing(true);
+    }
+    try {
+      const response = await fetch(`/api/get-mercado-pago-payment?payment_id=${encodeURIComponent(paymentId)}&order_id=${encodeURIComponent(orderId)}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Nao foi possivel verificar o Pix.");
+      }
+
+      const nextStatus = (result.status || "pendente") as PaymentStatus;
+      setPaymentStatus(nextStatus);
+      setOrder(current => {
+        if (!current) return current;
+        const nextOrder = {
+          ...current,
+          paymentMethod: "pix",
+          paymentStatus: nextStatus,
+          transactionId: result.paymentId || paymentId,
+          paidAt: result.paidAt || current.paidAt,
+        };
+        savePendingCheckout(nextOrder);
+        return nextOrder;
+      });
+
+      if (nextStatus === "aprovado" && showSuccessToast) {
+        toast.success("Pix aprovado! Pedido finalizado.");
+      }
+    } catch (error) {
+      console.error("Erro ao verificar Pix:", error);
+      if (showSuccessToast) {
+        toast.error(error instanceof Error ? error.message : "Nao foi possivel verificar o Pix.");
+      }
+    } finally {
+      if (showSuccessToast) {
+        setIsProcessing(false);
+      }
+    }
+  }, [order?.registeredOrderId, order?.transactionId, pixPayment?.paymentId]);
+
+  useEffect(() => {
+    if (selectedPaymentMethod !== "pix" || paymentStatus === "aprovado") return;
+    if (!pixPayment?.paymentId || !order?.registeredOrderId) return;
+
+    const interval = window.setInterval(() => {
+      void checkPixPayment(false);
+    }, 7000);
+
+    return () => window.clearInterval(interval);
+  }, [checkPixPayment, order?.registeredOrderId, paymentStatus, pixPayment?.paymentId, selectedPaymentMethod]);
 
   useEffect(() => {
     if (!order || order.items.length === 0 || order.registeredOrderId) return;
@@ -238,6 +319,17 @@ const Checkout = () => {
     });
   };
 
+  const copyPixCode = async () => {
+    if (!pixPayment?.qrCode) return;
+
+    try {
+      await navigator.clipboard.writeText(pixPayment.qrCode);
+      toast.success("Pix copia e cola copiado!");
+    } catch {
+      toast.error("Nao foi possivel copiar o Pix.");
+    }
+  };
+
   const confirmManualPayment = async () => {
     setIsProcessing(true);
     try {
@@ -255,7 +347,62 @@ const Checkout = () => {
     }
   };
 
-  const startMercadoPagoPayment = async () => {
+  const generatePixPayment = async () => {
+    if (!order) return;
+
+    if (pixPayment?.paymentId) {
+      await checkPixPayment();
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const savedOrder = await ensureRegisteredOrder("pix", "pendente");
+      const response = await fetch("/api/create-mercado-pago-pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: savedOrder.registeredOrderId,
+          total: savedOrder.total,
+          customerName: savedOrder.customer?.name,
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.qrCode) {
+        throw new Error(result.error || "Nao foi possivel gerar o Pix.");
+      }
+
+      const nextPixPayment = {
+        paymentId: result.paymentId,
+        qrCode: result.qrCode,
+        qrCodeBase64: result.qrCodeBase64 || "",
+        ticketUrl: result.ticketUrl || "",
+      };
+      const nextOrder = {
+        ...savedOrder,
+        paymentMethod: "pix",
+        paymentStatus: "pendente" as PaymentStatus,
+        transactionId: result.paymentId,
+        pixQrCode: nextPixPayment.qrCode,
+        pixQrCodeBase64: nextPixPayment.qrCodeBase64,
+        pixTicketUrl: nextPixPayment.ticketUrl,
+      };
+
+      setPixPayment(nextPixPayment);
+      setPaymentStatus("pendente");
+      setOrder(nextOrder);
+      savePendingCheckout(nextOrder);
+      toast.success("Pix gerado. O cliente pode pagar pelo banco que preferir.");
+    } catch (error) {
+      console.error("Erro ao gerar Pix:", error);
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel gerar o Pix.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const startCardPayment = async () => {
     if (!order) return;
 
     setIsProcessing(true);
@@ -308,7 +455,8 @@ const Checkout = () => {
     );
   }
 
-  const isMercadoPagoPayment = selectedPaymentMethod === "pix" || selectedPaymentMethod === "credito" || selectedPaymentMethod === "debito";
+  const isPixPayment = selectedPaymentMethod === "pix";
+  const isCardPayment = selectedPaymentMethod === "credito" || selectedPaymentMethod === "debito";
 
   return (
     <main className="min-h-screen bg-background">
@@ -394,6 +542,34 @@ const Checkout = () => {
             </div>
           )}
 
+          {isPixPayment && pixPayment?.qrCode && (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/50 p-3">
+              <div>
+                <p className="text-sm font-bold text-foreground">Pix copia e cola</p>
+                <p className="text-xs text-muted-foreground">O cliente paga no banco que preferir. A confirmacao aparece automaticamente.</p>
+              </div>
+
+              {pixPayment.qrCodeBase64 && (
+                <div className="flex justify-center rounded-lg bg-white p-3">
+                  <img
+                    src={`data:image/png;base64,${pixPayment.qrCodeBase64}`}
+                    alt="QR Code Pix"
+                    className="h-40 w-40 object-contain"
+                  />
+                </div>
+              )}
+
+              <div className="max-h-28 overflow-auto rounded-md border border-border bg-background p-2 text-xs break-all text-muted-foreground">
+                {pixPayment.qrCode}
+              </div>
+
+              <Button type="button" variant="outline" className="h-10 w-full gap-2 font-bold" onClick={() => void copyPixCode()}>
+                <Copy className="h-4 w-4" />
+                Copiar Pix
+              </Button>
+            </div>
+          )}
+
           <div className="rounded-lg border border-border bg-background p-3">
             <p className="flex items-center gap-2 text-sm font-bold">
               <CheckCircle2 className="h-4 w-4 text-primary" />
@@ -404,10 +580,15 @@ const Checkout = () => {
             )}
           </div>
 
-          {isMercadoPagoPayment ? (
-            <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void startMercadoPagoPayment()}>
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : selectedPaymentMethod === "pix" ? <QrCode className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
-              {selectedPaymentMethod === "pix" ? "Gerar PIX" : "Pagar com Mercado Pago"}
+          {isPixPayment ? (
+            <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing || paymentStatus === "aprovado"} onClick={() => void generatePixPayment()}>
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+              {paymentStatus === "aprovado" ? "Pix aprovado" : pixPayment?.paymentId ? "Verificar Pix" : "Gerar PIX"}
+            </Button>
+          ) : isCardPayment ? (
+            <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void startCardPayment()}>
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+              Pagar com Mercado Pago
             </Button>
           ) : (
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void confirmManualPayment()}>
