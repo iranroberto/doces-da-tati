@@ -77,9 +77,10 @@ const saveLocalCustomers = (customers: Customer[]) => {
 };
 
 const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
-  const localOrdersById = new Map(loadLocalOrders().map(order => [order.id, order]));
+  const localOrders = loadLocalOrders();
+  const localOrdersById = new Map(localOrders.map(order => [order.id, order]));
 
-  return rows.map(row => {
+  const remoteOrders = rows.map(row => {
     const id = String(row.id);
     const localOrder = localOrdersById.get(id);
     const customer = row.clientes as { nome?: unknown } | Array<{ nome?: unknown }> | undefined;
@@ -99,6 +100,25 @@ const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
       items: parseOrderItems(row.itens ?? localOrder?.items),
     };
   });
+
+  const remoteOrderIds = new Set(remoteOrders.map(order => order.id));
+  const localOnlyOrders: AdminOrder[] = localOrders
+    .filter(order => !remoteOrderIds.has(order.id))
+    .map(order => ({
+      id: order.id,
+      createdAt: order.createdAt,
+      customerName: order.customerName || "Cliente",
+      total: order.total,
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: normalizePaymentStatus(order.paymentStatus),
+      transactionId: order.transactionId,
+      items: order.items,
+    }));
+
+  return [...remoteOrders, ...localOnlyOrders].sort((a, b) => (
+    new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+  ));
 };
 
 const customerFromRow = (row: Record<string, unknown>): Customer => ({
@@ -457,9 +477,7 @@ const AdminDashboard = () => {
   const orderGroups = useMemo<CustomerOrderGroup[]>(() => {
     const groups = new Map<string, CustomerOrderGroup>();
 
-    const paidOrders = orders.filter(order => order.paymentStatus === "aprovado");
-
-    paidOrders.forEach(order => {
+    orders.forEach(order => {
       const customerName = order.customerName || "Cliente";
       const current = groups.get(customerName) || { customerName, total: 0, orders: [] };
       current.total += order.total;
@@ -478,8 +496,7 @@ const AdminDashboard = () => {
     const today = new Date();
     return orders.filter(order => {
       const createdAt = new Date(order.createdAt);
-      return order.paymentStatus === "aprovado"
-        && !Number.isNaN(createdAt.getTime())
+      return !Number.isNaN(createdAt.getTime())
         && createdAt.getFullYear() === today.getFullYear()
         && createdAt.getMonth() === today.getMonth()
         && createdAt.getDate() === today.getDate();
@@ -493,7 +510,7 @@ const AdminDashboard = () => {
   ), [orders]);
 
   const paidOrders = orders.filter(order => order.paymentStatus === "aprovado");
-  const recentOrders = paidOrders.slice(0, 5);
+  const recentOrders = orders.slice(0, 5);
 
   if (!isAdmin) {
     navigate("/admin");
@@ -1276,9 +1293,9 @@ const AdminDashboard = () => {
                 <p className="text-sm font-semibold text-[#d8c0a8]">Pedidos organizados por cliente, valor, data e entrega.</p>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{paidOrders.length} pedido(s) pago(s)</span>
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-green-300">{paidOrders.filter(order => order.status === "entregue").length} entregue(s)</span>
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{paidOrders.filter(order => order.status !== "entregue").length} pendente(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{orders.length} pedido(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-green-300">{orders.filter(order => order.status === "entregue").length} entregue(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{orders.filter(order => order.status !== "entregue").length} pendente(s)</span>
               </div>
             </div>
 
