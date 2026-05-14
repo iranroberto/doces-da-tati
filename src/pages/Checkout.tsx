@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Banknote, CheckCircle2, Copy, CreditCard, Heart, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
+import { ArrowLeft, Banknote, CheckCircle2, Clock, Copy, CreditCard, Heart, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
@@ -119,6 +119,13 @@ const getMercadoPagoReturnParams = () => {
   return new URLSearchParams(query);
 };
 
+const formatCountdown = (seconds: number) => {
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+};
+
 const Checkout = () => {
   const { config } = useStore();
   const navigate = useNavigate();
@@ -127,7 +134,17 @@ const Checkout = () => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pendente");
   const [isProcessing, setIsProcessing] = useState(false);
   const [pixPayment, setPixPayment] = useState<PixPayment | null>(null);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const thankYouToastShown = useRef(false);
+  const pixExpiresAtTime = useMemo(() => {
+    if (!pixPayment?.expiresAt) return 0;
+    const date = new Date(pixPayment.expiresAt);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  }, [pixPayment?.expiresAt]);
+  const pixSecondsRemaining = pixExpiresAtTime
+    ? Math.max(0, Math.ceil((pixExpiresAtTime - currentTime) / 1000))
+    : 0;
+  const isPixExpired = Boolean(pixPayment?.qrCode && pixExpiresAtTime && pixSecondsRemaining <= 0);
 
   useEffect(() => {
     const savedOrder = loadPendingCheckout();
@@ -257,7 +274,7 @@ const Checkout = () => {
   }, [order?.registeredOrderId, order?.transactionId, pixPayment?.paymentId]);
 
   useEffect(() => {
-    if (selectedPaymentMethod !== "pix" || paymentStatus === "aprovado") return;
+    if (selectedPaymentMethod !== "pix" || paymentStatus !== "pendente") return;
     if (!pixPayment?.paymentId || !order?.registeredOrderId) return;
 
     const interval = window.setInterval(() => {
@@ -266,6 +283,40 @@ const Checkout = () => {
 
     return () => window.clearInterval(interval);
   }, [checkPixPayment, order?.registeredOrderId, paymentStatus, pixPayment?.paymentId, selectedPaymentMethod]);
+
+  useEffect(() => {
+    if (!pixPayment?.qrCode || !pixExpiresAtTime || paymentStatus !== "pendente") return;
+
+    setCurrentTime(Date.now());
+    const interval = window.setInterval(() => setCurrentTime(Date.now()), 1000);
+
+    return () => window.clearInterval(interval);
+  }, [paymentStatus, pixExpiresAtTime, pixPayment?.qrCode]);
+
+  useEffect(() => {
+    if (!isPixExpired || paymentStatus !== "pendente" || !order?.registeredOrderId) return;
+
+    updateOrderPayment(order.registeredOrderId, {
+      paymentMethod: "pix",
+      paymentStatus: "cancelado",
+      transactionId: pixPayment?.paymentId || order.transactionId,
+    }).catch(error => {
+      console.error("Erro ao cancelar pedido Pix expirado:", error);
+    });
+
+    setPaymentStatus("cancelado");
+    setOrder(current => {
+      if (!current) return current;
+      const nextOrder = {
+        ...current,
+        paymentMethod: "pix",
+        paymentStatus: "cancelado" as PaymentStatus,
+      };
+      savePendingCheckout(nextOrder);
+      return nextOrder;
+    });
+    toast.error("Tempo para pagamento Pix encerrado.");
+  }, [isPixExpired, order?.registeredOrderId, order?.transactionId, paymentStatus, pixPayment?.paymentId]);
 
   useEffect(() => {
     if (paymentStatus !== "aprovado") return;
@@ -618,6 +669,21 @@ const Checkout = () => {
               <div>
                 <p className="text-sm font-bold text-foreground">Pix copia e cola</p>
                 <p className="text-xs text-muted-foreground">O cliente tem {pixPayment.expiresInMinutes || PIX_EXPIRATION_MINUTES} minutos para pagar. A confirmacao aparece automaticamente.</p>
+              </div>
+
+              <div className={isPixExpired
+                ? "flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-900"
+                : pixSecondsRemaining <= 60
+                  ? "flex items-center justify-between rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-yellow-900"
+                  : "flex items-center justify-between rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-primary"}
+              >
+                <span className="flex items-center gap-2 text-sm font-bold">
+                  <Clock className="h-4 w-4" />
+                  {isPixExpired ? "Tempo esgotado" : "Tempo restante"}
+                </span>
+                <span className="font-display text-2xl font-bold tabular-nums">
+                  {formatCountdown(pixSecondsRemaining)}
+                </span>
               </div>
 
               {pixPayment.qrCodeBase64 && (
