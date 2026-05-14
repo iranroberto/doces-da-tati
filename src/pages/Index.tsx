@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Instagram, PackageCheck, Search } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useStore } from "@/context/StoreContext";
 import CartDrawer from "@/components/CartDrawer";
 import CustomerAuthDialog from "@/components/CustomerAuthDialog";
@@ -150,7 +151,13 @@ const Index = () => {
       </main>
 
       <footer className="flex flex-col items-center gap-2 bg-muted py-6 text-center text-sm text-muted-foreground">
-        <p>(c) {new Date().getFullYear()} {config.name} - Todos os direitos reservados</p>
+        <p>
+          (c){" "}
+          <Link to="/admin" aria-label="Acessar painel admin" className="transition hover:text-primary">
+            {new Date().getFullYear()}
+          </Link>{" "}
+          {config.name} - Todos os direitos reservados
+        </p>
         {instagramUrl && (
           <a
             href={instagramUrl}
