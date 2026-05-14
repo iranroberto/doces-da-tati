@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
-import { deleteOrder, loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, updateOrderStatus, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
+import { deleteOrder, loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, updateOrderPayment, updateOrderStatus, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
 import { getProductPrice, hasPromotionalPrice } from "@/lib/pricing";
 import { formatPhone } from "@/lib/phone";
 import { supabase } from "@/lib/supabase";
@@ -245,6 +245,7 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [updatingOrderStatusId, setUpdatingOrderStatusId] = useState("");
+  const [updatingPaymentStatusId, setUpdatingPaymentStatusId] = useState("");
   const [deletingOrderId, setDeletingOrderId] = useState("");
 
   const buildProductData = (productId: string): { product?: Product; error?: string } => {
@@ -509,7 +510,6 @@ const AdminDashboard = () => {
       .reduce((sum, order) => sum + order.total, 0)
   ), [orders]);
 
-  const paidOrders = orders.filter(order => order.paymentStatus === "aprovado");
   const recentOrders = orders.slice(0, 5);
 
   if (!isAdmin) {
@@ -794,6 +794,27 @@ const AdminDashboard = () => {
       toast.error("Nao foi possivel atualizar o pedido.");
     } finally {
       setUpdatingOrderStatusId("");
+    }
+  };
+
+  const toggleOrderPaymentStatus = async (order: AdminOrder) => {
+    const nextPaymentStatus: PaymentStatus = order.paymentStatus === "aprovado" ? "pendente" : "aprovado";
+    setUpdatingPaymentStatusId(order.id);
+
+    try {
+      await updateOrderPayment(order.id, {
+        paymentMethod: order.paymentMethod,
+        paymentStatus: nextPaymentStatus,
+      });
+      setOrders(current => current.map(item => (
+        item.id === order.id ? { ...item, paymentStatus: nextPaymentStatus } : item
+      )));
+      toast.success(nextPaymentStatus === "aprovado" ? "Pagamento marcado como aprovado." : "Pagamento marcado como pendente.");
+    } catch (error) {
+      console.error("Erro ao atualizar pagamento do pedido:", error);
+      toast.error("Nao foi possivel atualizar o pagamento.");
+    } finally {
+      setUpdatingPaymentStatusId("");
     }
   };
 
@@ -1359,10 +1380,22 @@ const AdminDashboard = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                className={order.paymentStatus === "aprovado"
+                                  ? "w-full gap-2 border-yellow-300 bg-transparent text-yellow-100 hover:bg-yellow-950/40 hover:text-yellow-50"
+                                  : "w-full gap-2 border-green-300 bg-transparent text-green-100 hover:bg-green-950/40 hover:text-green-50"}
+                                disabled={updatingPaymentStatusId === order.id || updatingOrderStatusId === order.id || deletingOrderId === order.id}
+                                onClick={() => void toggleOrderPaymentStatus(order)}
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                                {order.paymentStatus === "aprovado" ? "Marcar pagamento pendente" : "Marcar pago"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 className={delivered
                                   ? "w-full gap-2 border-yellow-300 bg-transparent text-yellow-100 hover:bg-yellow-950/40 hover:text-yellow-50"
                                   : "w-full gap-2 border-green-300 bg-transparent text-green-100 hover:bg-green-950/40 hover:text-green-50"}
-                                disabled={updatingOrderStatusId === order.id || deletingOrderId === order.id}
+                                disabled={updatingOrderStatusId === order.id || updatingPaymentStatusId === order.id || deletingOrderId === order.id}
                                 onClick={() => void toggleOrderDeliveryStatus(order)}
                               >
                                 {delivered ? <ClipboardList className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
@@ -1372,7 +1405,7 @@ const AdminDashboard = () => {
                                 size="sm"
                                 variant="outline"
                                 className="w-full gap-2 border-red-300 bg-transparent text-red-200 hover:bg-red-950/40 hover:text-red-100"
-                                disabled={deletingOrderId === order.id || updatingOrderStatusId === order.id}
+                                disabled={deletingOrderId === order.id || updatingOrderStatusId === order.id || updatingPaymentStatusId === order.id}
                                 onClick={() => void handleDeleteOrder(order)}
                               >
                                 <Trash2 className="h-4 w-4" />
