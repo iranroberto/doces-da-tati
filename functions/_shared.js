@@ -172,9 +172,23 @@ export const requireAdminPassword = async (env, password) => {
 export const updateSupabaseOrderPayment = async (env, { orderId, paymentMethod, paymentStatus, transactionId, paidAt }) => {
   const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig(env);
 
-  if (!supabaseUrl || !supabaseKey || !orderId) return;
+  if (!supabaseUrl || !supabaseKey || !orderId) return { ok: false, skipped: true };
 
-  await fetch(`${supabaseUrl}/rest/v1/pedidos?id=eq.${encodeURIComponent(orderId)}`, {
+  const currentResponse = await fetch(`${supabaseUrl}/rest/v1/pedidos?id=eq.${encodeURIComponent(orderId)}&select=status_pagamento&limit=1`, {
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const currentRows = await currentResponse.json().catch(() => []);
+  const currentStatus = Array.isArray(currentRows) ? currentRows[0]?.status_pagamento : null;
+
+  if (currentStatus === "aprovado" && paymentStatus !== "aprovado") {
+    return { ok: true, skipped: "already_approved" };
+  }
+
+  const updateResponse = await fetch(`${supabaseUrl}/rest/v1/pedidos?id=eq.${encodeURIComponent(orderId)}`, {
     method: "PATCH",
     headers: {
       apikey: supabaseKey,
@@ -190,7 +204,14 @@ export const updateSupabaseOrderPayment = async (env, { orderId, paymentMethod, 
     }),
   });
 
+  if (!updateResponse.ok) {
+    const error = await updateResponse.json().catch(() => null);
+    return { ok: false, error: error?.message || "Erro ao atualizar pagamento no Supabase." };
+  }
+
   if (paymentStatus === "aprovado") {
     await decrementSupabaseStockForOrder(env, orderId);
   }
+
+  return { ok: true };
 };

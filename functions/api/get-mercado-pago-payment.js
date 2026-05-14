@@ -2,6 +2,22 @@ import { corsHeaders, getMercadoPagoCredentials, json, mercadoPagoStatusToApp, u
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders });
 
+const getPaymentDate = (payment) => {
+  const value = payment?.date_approved || payment?.date_created || payment?.date_last_updated;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isNaN(time) ? 0 : time;
+};
+
+const selectBestPayment = (payments) => {
+  if (!Array.isArray(payments) || !payments.length) return null;
+
+  return [...payments].sort((a, b) => {
+    if (a.status === "approved" && b.status !== "approved") return -1;
+    if (a.status !== "approved" && b.status === "approved") return 1;
+    return getPaymentDate(b) - getPaymentDate(a);
+  })[0];
+};
+
 export const onRequestGet = async ({ request, env }) => {
   const { accessToken } = await getMercadoPagoCredentials(env);
   if (!accessToken) return json({ error: "MERCADO_PAGO_ACCESS_TOKEN nao configurado." }, 500);
@@ -25,7 +41,7 @@ export const onRequestGet = async ({ request, env }) => {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     const result = await response.json();
-    payment = Array.isArray(result.results) ? result.results[0] : null;
+    payment = selectBestPayment(result.results);
   }
 
   if (!response.ok) {
@@ -45,13 +61,17 @@ export const onRequestGet = async ({ request, env }) => {
       ? "debito"
       : "credito";
 
-  await updateSupabaseOrderPayment(env, {
+  const updateResult = await updateSupabaseOrderPayment(env, {
     orderId: resolvedOrderId,
     paymentMethod: appPaymentMethod,
     paymentStatus,
     transactionId: String(payment.id),
     paidAt,
   });
+
+  if (updateResult && !updateResult.ok) {
+    return json({ error: updateResult.error || "Pagamento consultado, mas nao foi possivel atualizar o pedido." }, 500);
+  }
 
   return json({
     paymentId: String(payment.id),
