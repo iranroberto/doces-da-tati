@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, TrendingUp, Truck, Users, Wallet } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, RefreshCw, Save, ShieldCheck, Store, Tags, Trash2, TrendingUp, Truck, Users, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
-import { deleteOrder, loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, updateOrderStatus, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
+import { deleteOrder, loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, updateOrderPayment, updateOrderStatus, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
 import { getProductPrice, hasPromotionalPrice } from "@/lib/pricing";
 import { formatPhone } from "@/lib/phone";
 import { supabase } from "@/lib/supabase";
@@ -248,7 +248,9 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [updatingOrderStatusId, setUpdatingOrderStatusId] = useState("");
+  const [verifyingPaymentId, setVerifyingPaymentId] = useState("");
   const [deletingOrderId, setDeletingOrderId] = useState("");
+  const lastPaymentSyncById = useRef(new Map<string, number>());
 
   const buildProductData = (productId: string): { product?: Product; error?: string } => {
     const price = Number(pPrice);
@@ -280,6 +282,78 @@ const AdminDashboard = () => {
       },
     };
   };
+
+  const syncMercadoPagoPayment = useCallback(async (order: AdminOrder, showToast = true) => {
+    if (!order.id) {
+      if (showToast) toast.error("Este pedido ainda nao tem identificador para verificar.");
+      return;
+    }
+
+    if (showToast) setVerifyingPaymentId(order.id);
+
+    try {
+      const query = new URLSearchParams({ order_id: order.id });
+      if (order.transactionId) query.set("payment_id", order.transactionId);
+      const response = await fetch(`/api/get-mercado-pago-payment?${query.toString()}`);
+      const result = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(apiErrorMessage(result, "Nao foi possivel verificar o Pix."));
+      }
+
+      const nextStatus = normalizePaymentStatus(result.status);
+      const nextPaymentMethod = String(result.paymentMethod || order.paymentMethod || "pix");
+      const nextTransactionId = String(result.paymentId || order.transactionId);
+      const paidAt = result.paidAt ? String(result.paidAt) : undefined;
+
+      await updateOrderPayment(order.id, {
+        paymentMethod: nextPaymentMethod,
+        paymentStatus: nextStatus,
+        transactionId: nextTransactionId,
+        paidAt,
+      });
+
+      setOrders(current => current.map(item => (
+        item.id === order.id
+          ? {
+              ...item,
+              paymentMethod: nextPaymentMethod,
+              paymentStatus: nextStatus,
+              transactionId: nextTransactionId,
+            }
+          : item
+      )));
+
+      if (showToast) {
+        if (nextStatus === "aprovado") {
+          toast.success("Pagamento Pix confirmado.");
+        } else {
+          toast.info(`Pagamento ainda esta ${nextStatus}.`);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao sincronizar pagamento Mercado Pago:", error);
+      if (showToast) toast.error(error instanceof Error ? error.message : "Nao foi possivel verificar o Pix.");
+    } finally {
+      if (showToast) setVerifyingPaymentId("");
+    }
+  }, []);
+
+  const syncPendingPixOrders = useCallback((nextOrders: AdminOrder[]) => {
+    const now = Date.now();
+
+    nextOrders
+      .filter(order => order.paymentMethod === "pix" && order.paymentStatus === "pendente" && order.id)
+      .slice(0, 8)
+      .forEach(order => {
+        const syncKey = order.transactionId || order.id;
+        const lastSync = lastPaymentSyncById.current.get(syncKey) || 0;
+        if (now - lastSync < 60_000) return;
+
+        lastPaymentSyncById.current.set(syncKey, now);
+        void syncMercadoPagoPayment(order, false);
+      });
+  }, [syncMercadoPagoPayment]);
 
   useEffect(() => {
     if (storeFormDirty) return;
@@ -416,7 +490,9 @@ const AdminDashboard = () => {
     const loadOrders = async () => {
       try {
         if (!supabase) {
-          setOrders(loadLocalOrders());
+          const localOrders = loadLocalOrders();
+          setOrders(localOrders);
+          syncPendingPixOrders(localOrders);
           return;
         }
 
@@ -438,14 +514,18 @@ const AdminDashboard = () => {
         }
 
         if (isMissingOrdersTableError(error)) {
-          setOrders(loadLocalOrders());
+          const localOrders = loadLocalOrders();
+          setOrders(localOrders);
+          syncPendingPixOrders(localOrders);
           return;
         }
 
         if (error) throw error;
         if (!isMounted) return;
 
-        setOrders(mapOrderRows(data ?? []));
+        const mappedOrders = mapOrderRows(data ?? []);
+        setOrders(mappedOrders);
+        syncPendingPixOrders(mappedOrders);
       } catch (error) {
         console.error("Erro ao carregar pedidos:", error);
         if (tab === "orders") toast.error("Nao foi possivel carregar pedidos.");
@@ -475,7 +555,7 @@ const AdminDashboard = () => {
       window.removeEventListener("focus", refreshOrders);
       if (channel) void supabase?.removeChannel(channel);
     };
-  }, [tab]);
+  }, [syncPendingPixOrders, tab]);
 
   const orderGroups = useMemo<CustomerOrderGroup[]>(() => {
     const groups = new Map<string, CustomerOrderGroup>();
@@ -1537,6 +1617,22 @@ const AdminDashboard = () => {
                               {order.transactionId && <p className="break-all text-xs text-[#d8c0a8]">Transacao: {order.transactionId}</p>}
                             </div>
                             <div className="flex flex-col gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full gap-2 border-blue-300 bg-transparent text-blue-100 hover:bg-blue-950/40 hover:text-blue-50"
+                                disabled={
+                                  verifyingPaymentId === order.id
+                                  || deletingOrderId === order.id
+                                  || updatingOrderStatusId === order.id
+                                  || order.paymentMethod !== "pix"
+                                  || order.paymentStatus === "aprovado"
+                                }
+                                onClick={() => void syncMercadoPagoPayment(order)}
+                              >
+                                <RefreshCw className={verifyingPaymentId === order.id ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                                Verificar Pix
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
