@@ -42,7 +42,7 @@ interface PixPayment {
   expiresInMinutes: number;
 }
 
-const PIX_EXPIRATION_MINUTES = 5;
+const PIX_EXPIRATION_MINUTES = 30;
 
 const paymentOptions: Array<{ id: PaymentMethod; label: string; description: string; icon: typeof QrCode }> = [
   { id: "pix", label: "Pagamento via Pix", description: "", icon: QrCode },
@@ -448,7 +448,11 @@ const Checkout = () => {
   const generatePixPayment = async () => {
     if (!order) return;
 
-    if (pixPayment?.paymentId) {
+    const canReusePixPayment = pixPayment?.paymentId
+      && paymentStatus === "pendente"
+      && !isPixExpired;
+
+    if (canReusePixPayment) {
       await checkPixPayment();
       return;
     }
@@ -464,6 +468,7 @@ const Checkout = () => {
           total: savedOrder.total,
           customerName: savedOrder.customer?.name,
           storeName: config.name,
+          attemptId: crypto.randomUUID(),
         }),
       });
       const result = await readApiJson(response);
@@ -720,7 +725,7 @@ const Checkout = () => {
           {isPixPayment ? (
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing || paymentStatus === "aprovado"} onClick={() => void generatePixPayment()}>
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-              {paymentStatus === "aprovado" ? "Pix aprovado" : pixPayment?.paymentId ? "Verificar Pix" : "Gerar PIX"}
+              {paymentStatus === "aprovado" ? "Pix aprovado" : pixPayment?.paymentId && paymentStatus === "pendente" && !isPixExpired ? "Verificar Pix" : "Gerar novo PIX"}
             </Button>
           ) : isCardPayment ? (
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void startCardPayment()}>

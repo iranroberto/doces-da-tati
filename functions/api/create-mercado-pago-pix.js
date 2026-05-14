@@ -2,7 +2,7 @@ import { corsHeaders, getMercadoPagoCredentials, json, updateSupabaseOrderPaymen
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders });
 
-const PIX_EXPIRATION_MINUTES = 5;
+const PIX_EXPIRATION_MINUTES = 30;
 
 const readJson = async (response) => {
   const text = await response.text();
@@ -49,6 +49,9 @@ export const onRequestPost = async ({ request, env }) => {
     const total = Number(body.total || 0);
     const customerName = String(body.customerName || "Cliente");
     const storeName = String(body.storeName || env.STORE_NAME || "Loja");
+    const attemptId = String(body.attemptId || crypto.randomUUID())
+      .replace(/[^a-zA-Z0-9-]/g, "")
+      .slice(0, 64);
     const payerEmail = String(
       body.customerEmail || env.MERCADO_PAGO_DEFAULT_PAYER_EMAIL || buildFallbackPayerEmail(orderId)
     ).trim();
@@ -70,7 +73,7 @@ export const onRequestPost = async ({ request, env }) => {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
-        "X-Idempotency-Key": `pix-${orderId}`,
+        "X-Idempotency-Key": `pix-${orderId}-${attemptId}`,
       },
       body: JSON.stringify({
         transaction_amount: total,
