@@ -147,14 +147,14 @@ const CustomerAuthDialog = ({
               </div>
 
               <div>
-                <Label>Local</Label>
+                <Label>Local de entrega</Label>
                 <div className="relative mt-1">
                   <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={companyUnit}
                     onChange={(event) => setCompanyUnit(event.target.value)}
                     className="pl-9"
-                    placeholder="Seu local"
+                    placeholder="Local de entrega"
                     required
                   />
                 </div>
