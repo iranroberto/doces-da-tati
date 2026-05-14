@@ -29,6 +29,8 @@ interface PendingCheckout {
   pixQrCode?: string;
   pixQrCodeBase64?: string;
   pixTicketUrl?: string;
+  pixExpiresAt?: string;
+  pixExpiresInMinutes?: number;
 }
 
 interface PixPayment {
@@ -36,7 +38,11 @@ interface PixPayment {
   qrCode: string;
   qrCodeBase64: string;
   ticketUrl: string;
+  expiresAt: string;
+  expiresInMinutes: number;
 }
+
+const PIX_EXPIRATION_MINUTES = 5;
 
 const paymentOptions: Array<{ id: PaymentMethod; label: string; description: string; icon: typeof QrCode }> = [
   { id: "pix", label: "Pagamento via Pix", description: "", icon: QrCode },
@@ -79,6 +85,8 @@ const loadPendingCheckout = (): PendingCheckout | null => {
       pixQrCode: value.pixQrCode ? String(value.pixQrCode) : undefined,
       pixQrCodeBase64: value.pixQrCodeBase64 ? String(value.pixQrCodeBase64) : undefined,
       pixTicketUrl: value.pixTicketUrl ? String(value.pixTicketUrl) : undefined,
+      pixExpiresAt: value.pixExpiresAt ? String(value.pixExpiresAt) : undefined,
+      pixExpiresInMinutes: Number(value.pixExpiresInMinutes || PIX_EXPIRATION_MINUTES),
     };
   } catch {
     return null;
@@ -139,6 +147,8 @@ const Checkout = () => {
         qrCode: savedOrder.pixQrCode || "",
         qrCodeBase64: savedOrder.pixQrCodeBase64 || "",
         ticketUrl: savedOrder.pixTicketUrl || "",
+        expiresAt: savedOrder.pixExpiresAt || "",
+        expiresInMinutes: savedOrder.pixExpiresInMinutes || PIX_EXPIRATION_MINUTES,
       });
     }
   }, []);
@@ -288,21 +298,32 @@ const Checkout = () => {
     const items = order.items
       .map(item => `- ${item.quantity}x ${item.name} - ${formatPrice(item.price * item.quantity)}`)
       .join("\n");
-    const message = [
-      "Ola! Segue meu pedido.",
-      "",
-      customerName ? `Cliente: ${customerName}` : "",
-      customerWhatsapp ? `WhatsApp: ${customerWhatsapp}` : "",
-      items,
-      "",
-      `Total: ${formatPrice(order.total)}`,
-      `Pagamento: ${paymentMethodLabel(selectedPaymentMethod)}`,
-      `Status pagamento: ${paymentStatus}`,
-      order.transactionId ? `Transacao: ${order.transactionId}` : "",
-    ].filter(Boolean).join("\n");
+    const pixWaitingMessage = selectedPaymentMethod === "pix" && paymentStatus === "pendente" && pixPayment?.qrCode;
+    const message = pixWaitingMessage
+      ? [
+          `Ola, ${customerName || "cliente"}! Recebemos o seu pedido e estamos aguardando o pagamento.`,
+          "",
+          `Voce tem ${pixPayment.expiresInMinutes || PIX_EXPIRATION_MINUTES} minutos para pagar o valor de ${formatPrice(order.total)} usando o Pix Copia e Cola ou o QR Code abaixo. Apos esse prazo, o pedido sera cancelado automaticamente.`,
+          "",
+          "Pix Copia e Cola:",
+          pixPayment.qrCode,
+          pixPayment.ticketUrl ? `Link do QR Code: ${pixPayment.ticketUrl}` : "",
+        ].filter(Boolean).join("\n")
+      : [
+          "Ola! Segue meu pedido.",
+          "",
+          customerName ? `Cliente: ${customerName}` : "",
+          customerWhatsapp ? `WhatsApp: ${customerWhatsapp}` : "",
+          items,
+          "",
+          `Total: ${formatPrice(order.total)}`,
+          `Pagamento: ${paymentMethodLabel(selectedPaymentMethod)}`,
+          `Status pagamento: ${paymentStatus}`,
+          order.transactionId ? `Transacao: ${order.transactionId}` : "",
+        ].filter(Boolean).join("\n");
 
     return `https://wa.me/${config.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
-  }, [config.whatsapp, order, paymentStatus, selectedPaymentMethod]);
+  }, [config.whatsapp, order, paymentStatus, pixPayment, selectedPaymentMethod]);
 
   const ensureRegisteredOrder = async (method: PaymentMethod, status: PaymentStatus) => {
     if (!order) throw new Error("Pedido nao encontrado.");
@@ -405,6 +426,8 @@ const Checkout = () => {
         qrCode: result.qrCode,
         qrCodeBase64: result.qrCodeBase64 || "",
         ticketUrl: result.ticketUrl || "",
+        expiresAt: result.expiresAt || "",
+        expiresInMinutes: Number(result.expiresInMinutes || PIX_EXPIRATION_MINUTES),
       };
       const nextOrder = {
         ...savedOrder,
@@ -414,6 +437,8 @@ const Checkout = () => {
         pixQrCode: nextPixPayment.qrCode,
         pixQrCodeBase64: nextPixPayment.qrCodeBase64,
         pixTicketUrl: nextPixPayment.ticketUrl,
+        pixExpiresAt: nextPixPayment.expiresAt,
+        pixExpiresInMinutes: nextPixPayment.expiresInMinutes,
       };
 
       setPixPayment(nextPixPayment);
@@ -592,7 +617,7 @@ const Checkout = () => {
             <div className="space-y-3 rounded-lg border border-border bg-muted/50 p-3">
               <div>
                 <p className="text-sm font-bold text-foreground">Pix copia e cola</p>
-                <p className="text-xs text-muted-foreground">O cliente paga no banco que preferir. A confirmacao aparece automaticamente.</p>
+                <p className="text-xs text-muted-foreground">O cliente tem {pixPayment.expiresInMinutes || PIX_EXPIRATION_MINUTES} minutos para pagar. A confirmacao aparece automaticamente.</p>
               </div>
 
               {pixPayment.qrCodeBase64 && (

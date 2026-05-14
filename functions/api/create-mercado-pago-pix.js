@@ -2,6 +2,8 @@ import { corsHeaders, getMercadoPagoCredentials, json, updateSupabaseOrderPaymen
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders });
 
+const PIX_EXPIRATION_MINUTES = 5;
+
 const readJson = async (response) => {
   const text = await response.text();
   if (!text) return {};
@@ -51,6 +53,7 @@ export const onRequestPost = async ({ request, env }) => {
       body.customerEmail || env.MERCADO_PAGO_DEFAULT_PAYER_EMAIL || buildFallbackPayerEmail(orderId)
     ).trim();
     const notificationUrl = env.MERCADO_PAGO_WEBHOOK_URL || `${getSiteUrl(request, env)}/api/webhooks/mercadopago`;
+    const pixExpiresAt = new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000).toISOString();
 
     if (!orderId || !total || total <= 0) {
       return json({ error: "Dados invalidos para criar PIX." }, 400);
@@ -74,6 +77,7 @@ export const onRequestPost = async ({ request, env }) => {
         description: `Pedido ${storeName} - ${customerName}`.slice(0, 255),
         payment_method_id: "pix",
         external_reference: orderId,
+        date_of_expiration: pixExpiresAt,
         payer: {
           email: payerEmail,
           first_name: customerName.split(" ")[0] || "Cliente",
@@ -115,6 +119,8 @@ export const onRequestPost = async ({ request, env }) => {
       qrCode,
       qrCodeBase64: transactionData.qr_code_base64 || "",
       ticketUrl: transactionData.ticket_url || "",
+      expiresAt: pixExpiresAt,
+      expiresInMinutes: PIX_EXPIRATION_MINUTES,
     });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Erro inesperado." }, 500);
