@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, CheckCircle2, ClipboardList, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, Truck, Users } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, TrendingUp, Truck, Users, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
@@ -156,6 +156,9 @@ const formatDateTime = (value: string) => {
     minute: "2-digit",
   }).format(date);
 };
+
+const formatShortWeekday = (value: Date) =>
+  new Intl.DateTimeFormat("pt-BR", { weekday: "short" }).format(value).replace(".", "");
 
 const formatOrderItems = (items: OrderItemDraft[]) => {
   if (!items.length) return "Itens nao registrados neste pedido";
@@ -509,6 +512,74 @@ const AdminDashboard = () => {
       .reduce((sum, order) => sum + order.total, 0)
   ), [orders]);
 
+  const totalRevenue = useMemo(() => (
+    orders.reduce((sum, order) => sum + order.total, 0)
+  ), [orders]);
+
+  const deliveryPendingOrders = useMemo(() => (
+    orders.filter(order => order.status !== "entregue")
+  ), [orders]);
+
+  const deliveredOrders = useMemo(() => (
+    orders.filter(order => order.status === "entregue")
+  ), [orders]);
+
+  const pendingPaymentOrders = useMemo(() => (
+    orders.filter(order => order.paymentStatus === "pendente")
+  ), [orders]);
+
+  const averageTicket = orders.length ? totalRevenue / orders.length : 0;
+  const activeProducts = products.filter(product => product.stock > 0);
+  const lowStockProducts = products.filter(product => product.stock > 0 && product.stock <= 3);
+
+  const revenueByDay = useMemo(() => {
+    const today = new Date();
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(today);
+      date.setHours(0, 0, 0, 0);
+      date.setDate(today.getDate() - (6 - index));
+
+      return {
+        key: date.toISOString().slice(0, 10),
+        label: formatShortWeekday(date),
+        total: 0,
+      };
+    });
+    const daysByKey = new Map(days.map(day => [day.key, day]));
+
+    orders
+      .filter(order => order.paymentStatus === "aprovado")
+      .forEach(order => {
+        const createdAt = new Date(order.createdAt);
+        if (Number.isNaN(createdAt.getTime())) return;
+        const key = createdAt.toISOString().slice(0, 10);
+        const day = daysByKey.get(key);
+        if (day) day.total += order.total;
+      });
+
+    return days;
+  }, [orders]);
+
+  const maxDailyRevenue = Math.max(...revenueByDay.map(day => day.total), 1);
+
+  const topProducts = useMemo(() => {
+    const productsByName = new Map<string, { name: string; quantity: number; total: number }>();
+
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        const name = item.name || "Produto";
+        const current = productsByName.get(name) || { name, quantity: 0, total: 0 };
+        current.quantity += item.quantity;
+        current.total += item.price * item.quantity;
+        productsByName.set(name, current);
+      });
+    });
+
+    return Array.from(productsByName.values())
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 4);
+  }, [orders]);
+
   const recentOrders = orders.slice(0, 5);
 
   if (!isAdmin) {
@@ -820,9 +891,12 @@ const AdminDashboard = () => {
   };
 
   const dashboardCards = [
-    { label: "Pedidos hoje", value: String(todaysOrders.length), icon: ClipboardList },
-    { label: "Faturamento", value: formatPrice(approvedRevenue), icon: DollarSign },
-    { label: "Clientes", value: String(customers.length), icon: Users },
+    { label: "Pedidos hoje", value: String(todaysOrders.length), detail: `${orders.length} no total`, icon: ClipboardList },
+    { label: "Faturamento pago", value: formatPrice(approvedRevenue), detail: `${formatPrice(totalRevenue)} em pedidos`, icon: DollarSign },
+    { label: "Ticket medio", value: formatPrice(averageTicket), detail: orders.length ? "media por pedido" : "sem pedidos ainda", icon: TrendingUp },
+    { label: "A entregar", value: String(deliveryPendingOrders.length), detail: `${deliveredOrders.length} entregue(s)`, icon: Truck },
+    { label: "Pagamentos pendentes", value: String(pendingPaymentOrders.length), detail: "aguardando confirmacao", icon: Clock },
+    { label: "Clientes", value: String(customers.length), detail: `${activeProducts.length} produto(s) ativos`, icon: Users },
   ];
 
   const navItems = [
@@ -876,50 +950,158 @@ const AdminDashboard = () => {
         )}
 
         {tab === "dashboard" && (
-          <div className="space-y-10">
-            <h1 className="font-display text-4xl text-[#f0d8c0]">Dashboard</h1>
+          <div className="space-y-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h1 className="font-display text-4xl text-[#f0d8c0]">Dashboard</h1>
+                <p className="mt-1 text-sm font-semibold text-[#d8c0a8]">Resumo operacional da loja, pagamentos, entregas e estoque.</p>
+              </div>
+              <div className="flex w-fit items-center gap-2 rounded-full border border-[#603000] bg-[#481800] px-4 py-2 text-sm font-bold text-[#f0d8a8]">
+                <ShieldCheck className="h-4 w-4" />
+                Online
+              </div>
+            </div>
 
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {dashboardCards.map(card => {
                 const Icon = card.icon;
 
                 return (
-                  <div key={card.label} className="rounded-[18px] border border-[#603000] bg-[#481800] p-6 shadow-[0_18px_50px_rgba(0,0,0,0.24)]">
-                    <div className="flex items-start justify-between">
+                  <div key={card.label} className="rounded-[18px] border border-[#603000] bg-[#481800] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.24)]">
+                    <div className="flex items-start justify-between gap-3">
                       <p className="text-sm font-semibold uppercase text-[#d8c0a8]">{card.label}</p>
-                      <Icon className="h-9 w-9 text-[#d8c090]" />
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#f0d8c0]/10 text-[#f0d8a8]">
+                        <Icon className="h-5 w-5" />
+                      </span>
                     </div>
-                    <p className="mt-6 font-display text-4xl text-[#f0d8a8]">{card.value}</p>
+                    <p className="mt-5 font-display text-3xl text-[#f0d8a8]">{card.value}</p>
+                    <p className="mt-1 text-sm font-semibold text-[#d8c0a8]">{card.detail}</p>
                   </div>
                 );
               })}
             </div>
 
-            <div className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
-              <div className="grid grid-cols-4 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
-                <span>Data</span>
-                <span>Cliente</span>
-                <span>Total</span>
-                <span>Status</span>
-              </div>
-              {recentOrders.length === 0 ? (
-                <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
-                  Nenhum pedido ainda
+            <div className="grid gap-4 xl:grid-cols-[1.45fr_0.85fr]">
+              <section className="rounded-[18px] border border-[#603000] bg-[#481800] p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-display text-2xl text-[#f0d8a8]">Faturamento dos ultimos 7 dias</h2>
+                    <p className="text-sm font-semibold text-[#d8c0a8]">Somente pedidos com pagamento aprovado.</p>
+                  </div>
+                  <Wallet className="h-6 w-6 text-[#d8c090]" />
                 </div>
-              ) : (
-                <div className="divide-y divide-[#603000]">
-                  {recentOrders.map(order => (
-                    <div key={order.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-4 md:gap-4">
-                      <span className="font-bold">{formatDateTime(order.createdAt)}</span>
-                      <span>{order.customerName}</span>
-                      <span className="font-bold text-[#f0d8a8]">{formatPrice(order.total)}</span>
-                      <span className={order.status === "entregue" ? "font-bold text-green-300" : "font-bold text-yellow-200"}>
-                        {order.status === "entregue" ? "Entregue" : "Pendente"}
-                      </span>
-                    </div>
-                  ))}
+                <div className="mt-5 flex h-56 items-end gap-3">
+                  {revenueByDay.map(day => {
+                    const height = Math.max(8, Math.round((day.total / maxDailyRevenue) * 100));
+
+                    return (
+                      <div key={day.key} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                        <div className="flex h-36 w-full items-end rounded-lg bg-[#220b00]/70 p-1">
+                          <div
+                            className="w-full rounded-md bg-[#f0d8a8]"
+                            style={{ height: `${height}%` }}
+                            title={formatPrice(day.total)}
+                          />
+                        </div>
+                        <span className="text-xs font-bold uppercase text-[#d8c0a8]">{day.label}</span>
+                        <span className="text-xs font-bold text-[#f0d8a8]">{formatPrice(day.total)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </section>
+
+              <section className="rounded-[18px] border border-[#603000] bg-[#481800] p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-display text-2xl text-[#f0d8a8]">Atencao</h2>
+                    <p className="text-sm font-semibold text-[#d8c0a8]">Itens que merecem acompanhamento.</p>
+                  </div>
+                  <AlertTriangle className="h-6 w-6 text-yellow-200" />
+                </div>
+                <div className="mt-5 space-y-3">
+                  <div className="rounded-lg border border-[#603000] bg-[#220b00]/45 p-4">
+                    <p className="text-xs font-bold uppercase text-[#d8c0a8]">Estoque baixo</p>
+                    <p className="mt-1 font-display text-3xl text-yellow-200">{lowStockProducts.length}</p>
+                    <p className="mt-1 text-sm font-semibold text-[#d8c0a8]">produto(s) com 3 unidades ou menos</p>
+                  </div>
+                  <div className="rounded-lg border border-[#603000] bg-[#220b00]/45 p-4">
+                    <p className="text-xs font-bold uppercase text-[#d8c0a8]">Pedidos pendentes</p>
+                    <p className="mt-1 font-display text-3xl text-yellow-200">{deliveryPendingOrders.length}</p>
+                    <p className="mt-1 text-sm font-semibold text-[#d8c0a8]">aguardando entrega</p>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <section className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
+                <div className="flex items-center justify-between border-b border-[#603000] px-5 py-4">
+                  <div>
+                    <h2 className="font-display text-2xl text-[#f0d8a8]">Ultimos pedidos</h2>
+                    <p className="text-sm font-semibold text-[#d8c0a8]">Acompanhamento rapido de status.</p>
+                  </div>
+                  <Button size="sm" variant="outline" className="border-[#d8c090] bg-transparent text-[#f0d8a8] hover:bg-[#603000] hover:text-[#f0d8c0]" onClick={() => setTab("orders")}>
+                    Ver todos
+                  </Button>
+                </div>
+                <div className="grid grid-cols-4 gap-4 border-b border-[#603000] px-5 py-3 text-xs font-bold uppercase text-[#f0d8a8]">
+                  <span>Data</span>
+                  <span>Cliente</span>
+                  <span>Total</span>
+                  <span>Status</span>
+                </div>
+                {recentOrders.length === 0 ? (
+                  <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
+                    Nenhum pedido ainda
+                  </div>
+                ) : (
+                  <div className="divide-y divide-[#603000]">
+                    {recentOrders.map(order => (
+                      <div key={order.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-4 md:gap-4">
+                        <span className="font-bold">{formatDateTime(order.createdAt)}</span>
+                        <span>{order.customerName}</span>
+                        <span className="font-bold text-[#f0d8a8]">{formatPrice(order.total)}</span>
+                        <span className={order.status === "entregue" ? "font-bold text-green-300" : "font-bold text-yellow-200"}>
+                          {order.status === "entregue" ? "Entregue" : "Pendente"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-[18px] border border-[#603000] bg-[#481800] p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-display text-2xl text-[#f0d8a8]">Mais vendidos</h2>
+                    <p className="text-sm font-semibold text-[#d8c0a8]">Por quantidade nos pedidos.</p>
+                  </div>
+                  <Package className="h-6 w-6 text-[#d8c090]" />
+                </div>
+                {topProducts.length === 0 ? (
+                  <div className="mt-5 rounded-lg border border-dashed border-[#603000] px-4 py-10 text-center text-sm font-semibold text-[#d8c0a8]">
+                    Sem itens vendidos ainda
+                  </div>
+                ) : (
+                  <div className="mt-5 space-y-3">
+                    {topProducts.map((product, index) => (
+                      <div key={product.name} className="flex items-center justify-between gap-3 rounded-lg border border-[#603000] bg-[#220b00]/45 p-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#f0d8c0] text-sm font-black text-[#481800]">
+                            {index + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate font-bold text-[#f0d8c0]">{product.name}</p>
+                            <p className="text-xs font-semibold text-[#d8c0a8]">{product.quantity} unidade(s)</p>
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-sm font-bold text-[#f0d8a8]">{formatPrice(product.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
           </div>
         )}
