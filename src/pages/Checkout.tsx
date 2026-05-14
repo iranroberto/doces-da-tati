@@ -149,24 +149,41 @@ const Checkout = () => {
     const orderId = params.get("order_id") || params.get("external_reference") || order?.registeredOrderId;
     const fallbackStatus = params.get("mp_result") === "failure" ? "recusado" : "pendente";
 
-    if (!paymentId || !orderId) return;
+    if (!orderId || (!paymentId && !params.get("mp_result"))) return;
 
     setIsProcessing(true);
-    fetch(`/api/get-mercado-pago-payment?payment_id=${encodeURIComponent(paymentId)}&order_id=${encodeURIComponent(orderId)}`)
-      .then(response => readApiJson(response))
+    const query = new URLSearchParams({ order_id: orderId });
+    if (paymentId) query.set("payment_id", paymentId);
+
+    fetch(`/api/get-mercado-pago-payment?${query.toString()}`)
+      .then(async response => {
+        const result = await readApiJson(response);
+        if (!response.ok) {
+          throw new Error(getApiErrorMessage(result, "Nao foi possivel atualizar o status do pagamento."));
+        }
+        return result;
+      })
       .then(async result => {
         const nextStatus = (result.status || fallbackStatus) as PaymentStatus;
+        const nextPaymentMethod = result.paymentMethod || selectedPaymentMethod;
+        const nextTransactionId = result.paymentId || paymentId || undefined;
+        await updateOrderPayment(orderId, {
+          paymentMethod: nextPaymentMethod,
+          paymentStatus: nextStatus,
+          transactionId: nextTransactionId,
+          paidAt: result.paidAt,
+        });
         setPaymentStatus(nextStatus);
-        setSelectedPaymentMethod(result.paymentMethod || selectedPaymentMethod);
+        setSelectedPaymentMethod(nextPaymentMethod);
 
         setOrder(current => {
           if (!current) return current;
           const nextOrder = {
             ...current,
             registeredOrderId: orderId,
-            paymentMethod: result.paymentMethod || current.paymentMethod || selectedPaymentMethod,
+            paymentMethod: nextPaymentMethod || current.paymentMethod || selectedPaymentMethod,
             paymentStatus: nextStatus,
-            transactionId: result.paymentId || paymentId,
+            transactionId: nextTransactionId,
             paidAt: result.paidAt || current.paidAt,
           };
           savePendingCheckout(nextOrder);
