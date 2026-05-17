@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Instagram, PackageCheck, Search } from "lucide-react";
+import { Download, Instagram, PackageCheck, Search } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
 import CartDrawer from "@/components/CartDrawer";
 import CustomerAuthDialog from "@/components/CustomerAuthDialog";
@@ -10,6 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type ProductFilter = "all" | "promo" | "available";
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
 
 const getInstagramUrl = (value: string) => {
   const cleaned = value.trim();
@@ -32,6 +38,8 @@ const Index = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ProductFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   const visibleCategories = useMemo(() => categories.filter(category => category.isActive), [categories]);
   const instagramUrl = useMemo(() => getInstagramUrl(config.instagram), [config.instagram]);
@@ -60,6 +68,30 @@ const Index = () => {
   ].filter(item => item.visible && item.label.trim());
 
   useEffect(() => {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+      || ("standalone" in window.navigator && Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone));
+    setIsStandalone(standalone);
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const handleAppInstalled = () => {
+      setInstallPrompt(null);
+      setIsStandalone(true);
+      toast.success("Aplicativo instalado!");
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  useEffect(() => {
     if (filter === "promo" && !config.showFilterPromo) setFilter("all");
     if (filter === "available" && !config.showFilterAvailable) setFilter("all");
   }, [config.showFilterAvailable, config.showFilterPromo, filter]);
@@ -68,11 +100,41 @@ const Index = () => {
     if (!config.showCategoryFilter) setCategoryFilter("all");
   }, [config.showCategoryFilter]);
 
+  const handleInstallApp = async () => {
+    if (!installPrompt) {
+      toast.info("No iPhone, use Compartilhar e Adicionar a Tela de Inicio. No Android, abra no Chrome e tente novamente.");
+      return;
+    }
+
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    setInstallPrompt(null);
+
+    if (choice.outcome === "accepted") {
+      toast.success("Instalando aplicativo...");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <StoreHeader onCartOpen={() => setCartOpen(true)} onCustomerAuthOpen={() => setCustomerAuthOpen(true)} />
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} onCustomerAuthOpen={() => setCustomerAuthOpen(true)} />
       <CustomerAuthDialog open={customerAuthOpen} onOpenChange={setCustomerAuthOpen} />
+
+      {!isStandalone && (
+        <section className="border-b border-primary/15 bg-card">
+          <div className="container mx-auto flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-bold text-foreground">Instalar aplicativo</p>
+              <p className="mt-1 text-sm text-muted-foreground">Abra a loja direto pelo app da Doces da Tati.</p>
+            </div>
+            <Button className="h-11 gap-2 font-bold sm:w-auto" onClick={() => void handleInstallApp()}>
+              <Download className="h-4 w-4" />
+              Baixar app
+            </Button>
+          </div>
+        </section>
+      )}
 
       {promoCount > 0 && config.showFilterPromo && (
         <div className="bg-secondary py-2 text-center">

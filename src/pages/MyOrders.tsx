@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Clock, Download, Package, ReceiptText, Star, Truck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Package, ReceiptText, Star, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
@@ -18,11 +18,6 @@ interface CustomerOrder {
   transactionId: string;
   paidAt: string;
   items: OrderItemDraft[];
-}
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
 const formatPrice = (value: number) =>
@@ -127,32 +122,6 @@ const MyOrders = () => {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [savingRatingKey, setSavingRatingKey] = useState("");
   const [loading, setLoading] = useState(true);
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isStandalone, setIsStandalone] = useState(false);
-
-  useEffect(() => {
-    const standalone = window.matchMedia("(display-mode: standalone)").matches
-      || ("standalone" in window.navigator && Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone));
-    setIsStandalone(standalone);
-
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
-    };
-    const handleAppInstalled = () => {
-      setInstallPrompt(null);
-      setIsStandalone(true);
-      toast.success("Aplicativo instalado!");
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleAppInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handleAppInstalled);
-    };
-  }, []);
 
   useEffect(() => {
     if (isCustomerLoading) return;
@@ -266,21 +235,6 @@ const MyOrders = () => {
     }
   };
 
-  const handleInstallApp = async () => {
-    if (!installPrompt) {
-      toast.info("No iPhone, use Compartilhar e Adicionar a Tela de Inicio. No Android, abra no Chrome e tente novamente.");
-      return;
-    }
-
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    setInstallPrompt(null);
-
-    if (choice.outcome === "accepted") {
-      toast.success("Instalando aplicativo...");
-    }
-  };
-
   if (!customer && !isCustomerLoading) {
     return (
       <main className="min-h-screen bg-background px-4 py-10">
@@ -311,21 +265,6 @@ const MyOrders = () => {
       </header>
 
       <div className="container mx-auto space-y-5 px-4 py-5">
-        {!isStandalone && (
-          <div className="rounded-lg border border-primary/20 bg-card p-4 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-bold text-foreground">Instalar aplicativo</p>
-                <p className="mt-1 text-sm text-muted-foreground">Abra seus pedidos direto pelo app da Doces da Tati.</p>
-              </div>
-              <Button className="h-11 gap-2 font-bold" onClick={() => void handleInstallApp()}>
-                <Download className="h-4 w-4" />
-                Baixar app
-              </Button>
-            </div>
-          </div>
-        )}
-
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-sm font-bold text-muted-foreground">Pedidos</p>
