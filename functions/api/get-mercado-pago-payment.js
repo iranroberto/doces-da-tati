@@ -30,22 +30,40 @@ export const onRequestGet = async ({ request, env }) => {
 
   let response;
   let payment;
+  let paymentById = null;
+  let paymentByOrder = null;
+  let searchResponse = null;
 
   if (paymentId) {
     response = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    payment = await response.json();
-  } else {
-    response = await fetch(`https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(orderId)}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const result = await response.json();
-    payment = selectBestPayment(result.results);
+    paymentById = await response.json();
   }
 
-  if (!response.ok) {
-    return json({ error: payment?.message || "Erro ao consultar pagamento.", details: payment }, response.status);
+  if (orderId) {
+    searchResponse = await fetch(`https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(orderId)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const result = await searchResponse.json();
+    if (!searchResponse.ok) {
+      return json({ error: result?.message || "Erro ao consultar pagamentos do pedido.", details: result }, searchResponse.status);
+    }
+    paymentByOrder = selectBestPayment(result.results);
+  }
+
+  if (paymentById && paymentByOrder) {
+    payment = selectBestPayment([paymentById, paymentByOrder]);
+  } else {
+    payment = paymentByOrder || paymentById;
+  }
+
+  if (paymentId && response && !response.ok) {
+    if (paymentByOrder) {
+      payment = paymentByOrder;
+    } else {
+      return json({ error: paymentById?.message || "Erro ao consultar pagamento.", details: paymentById }, response.status);
+    }
   }
 
   if (!payment) {
