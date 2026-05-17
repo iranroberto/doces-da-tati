@@ -949,38 +949,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleMarkOrderPaid = async (order: AdminOrder) => {
-    const confirmed = window.confirm(`Marcar o pedido de ${order.customerName} no valor de ${formatPrice(order.total)} como pago?`);
-    if (!confirmed) return;
-
-    setVerifyingPaymentId(order.id);
-
-    try {
-      await updateOrderPayment(order.id, {
-        paymentMethod: order.paymentMethod || "pix",
-        paymentStatus: "aprovado",
-        transactionId: order.transactionId,
-        paidAt: new Date().toISOString(),
-      });
-
-      setOrders(current => current.map(item => (
-        item.id === order.id
-          ? {
-              ...item,
-              paymentMethod: item.paymentMethod || "pix",
-              paymentStatus: "aprovado",
-            }
-          : item
-      )));
-      toast.success("Pedido marcado como pago.");
-    } catch (error) {
-      console.error("Erro ao marcar pagamento como aprovado:", error);
-      toast.error("Nao foi possivel marcar o pedido como pago.");
-    } finally {
-      setVerifyingPaymentId("");
-    }
-  };
-
   const handleDeleteOrder = async (order: AdminOrder) => {
     const confirmed = window.confirm(`Apagar o pedido de ${order.customerName} no valor de ${formatPrice(order.total)}?`);
     if (!confirmed) return;
@@ -1652,18 +1620,6 @@ const AdminDashboard = () => {
                               {order.transactionId && <p className="break-all text-xs text-[#d8c0a8]">Transacao: {order.transactionId}</p>}
                             </div>
                             <div className="flex flex-col gap-2">
-                              {order.paymentStatus !== "aprovado" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="w-full gap-2 border-green-300 bg-transparent text-green-100 hover:bg-green-950/40 hover:text-green-50"
-                                  disabled={verifyingPaymentId === order.id || updatingOrderStatusId === order.id || deletingOrderId === order.id}
-                                  onClick={() => void handleMarkOrderPaid(order)}
-                                >
-                                  <CheckCircle2 className="h-4 w-4" />
-                                  Marcar pago
-                                </Button>
-                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
