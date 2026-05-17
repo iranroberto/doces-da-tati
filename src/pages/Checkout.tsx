@@ -43,6 +43,7 @@ interface PixPayment {
 }
 
 const PIX_EXPIRATION_MINUTES = 30;
+const PIX_PAYMENT_CHECK_INTERVAL_MS = 3000;
 
 const paymentOptions: Array<{ id: PaymentMethod; label: string; description: string; icon: typeof QrCode }> = [
   { id: "pix", label: "Pagamento via Pix", description: "", icon: QrCode },
@@ -136,6 +137,7 @@ const Checkout = () => {
   const [pixPayment, setPixPayment] = useState<PixPayment | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const thankYouToastShown = useRef(false);
+  const approvedPaymentHandled = useRef(false);
   const pixExpiresAtTime = useMemo(() => {
     if (!pixPayment?.expiresAt) return 0;
     const date = new Date(pixPayment.expiresAt);
@@ -228,11 +230,13 @@ const Checkout = () => {
     const paymentId = pixPayment?.paymentId || order?.transactionId;
     const orderId = order?.registeredOrderId;
 
-    if (!paymentId || !orderId) return;
+    if (!orderId) return;
 
     if (showSuccessToast) setIsProcessing(true);
     try {
-      const response = await fetch(`/api/get-mercado-pago-payment?payment_id=${encodeURIComponent(paymentId)}&order_id=${encodeURIComponent(orderId)}`);
+      const query = new URLSearchParams({ order_id: orderId });
+      if (paymentId) query.set("payment_id", paymentId);
+      const response = await fetch(`/api/get-mercado-pago-payment?${query.toString()}`);
       const result = await readApiJson(response);
 
       if (!response.ok) {
@@ -275,14 +279,14 @@ const Checkout = () => {
 
   useEffect(() => {
     if (selectedPaymentMethod !== "pix" || paymentStatus !== "pendente") return;
-    if (!pixPayment?.paymentId || !order?.registeredOrderId) return;
+    if (!order?.registeredOrderId) return;
 
     const interval = window.setInterval(() => {
       void checkPixPayment(false);
-    }, 7000);
+    }, PIX_PAYMENT_CHECK_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
-  }, [checkPixPayment, order?.registeredOrderId, paymentStatus, pixPayment?.paymentId, selectedPaymentMethod]);
+  }, [checkPixPayment, order?.registeredOrderId, paymentStatus, selectedPaymentMethod]);
 
   useEffect(() => {
     if (!pixPayment?.qrCode || !pixExpiresAtTime || paymentStatus !== "pendente") return;
@@ -320,6 +324,8 @@ const Checkout = () => {
 
   useEffect(() => {
     if (paymentStatus !== "aprovado") return;
+    if (approvedPaymentHandled.current) return;
+    approvedPaymentHandled.current = true;
 
     if (!thankYouToastShown.current) {
       toast.success("Pagamento confirmado. Obrigado pelo pedido!");
@@ -334,11 +340,7 @@ const Checkout = () => {
       });
     }
 
-    const timeout = window.setTimeout(() => {
-      navigate("/meus-pedidos");
-    }, 1800);
-
-    return () => window.clearTimeout(timeout);
+    navigate("/meus-pedidos", { replace: true });
   }, [navigate, order?.items, order?.registeredOrderId, paymentStatus]);
 
   const whatsappUrl = useMemo(() => {
@@ -565,6 +567,7 @@ const Checkout = () => {
 
   const isPixPayment = selectedPaymentMethod === "pix";
   const isCardPayment = selectedPaymentMethod === "credito" || selectedPaymentMethod === "debito";
+  const isWaitingForPixPayment = Boolean(isPixPayment && pixPayment?.paymentId && paymentStatus === "pendente" && !isPixExpired);
 
   return (
     <main className="min-h-screen bg-background">
@@ -723,9 +726,9 @@ const Checkout = () => {
           </div>
 
           {isPixPayment ? (
-            <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing || paymentStatus === "aprovado"} onClick={() => void generatePixPayment()}>
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-              {paymentStatus === "aprovado" ? "Pix aprovado" : pixPayment?.paymentId && paymentStatus === "pendente" && !isPixExpired ? "Verificar Pix" : "Gerar novo PIX"}
+            <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing || paymentStatus === "aprovado" || isWaitingForPixPayment} onClick={() => void generatePixPayment()}>
+              {isProcessing || isWaitingForPixPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+              {paymentStatus === "aprovado" ? "Pix aprovado" : isWaitingForPixPayment ? "Aguardando pagamento..." : "Gerar novo PIX"}
             </Button>
           ) : isCardPayment ? (
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void startCardPayment()}>
