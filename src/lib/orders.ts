@@ -28,7 +28,7 @@ export interface OrderDraft {
   registeredOrderId?: string;
 }
 
-export type PaymentMethod = "pix" | "dinheiro" | "credito" | "debito";
+export type PaymentMethod = "pix" | "dinheiro";
 export type PaymentStatus = "aprovado" | "pendente" | "recusado" | "cancelado";
 
 export interface LocalOrder {
@@ -111,8 +111,6 @@ export const normalizePaymentStatus = (status: unknown): PaymentStatus => {
 export const paymentMethodLabel = (method: string) => {
   if (method === "pix") return "PIX";
   if (method === "dinheiro") return "Dinheiro";
-  if (method === "credito") return "Cartao de Credito";
-  if (method === "debito") return "Cartao de Debito";
   return method || "Nao informado";
 };
 

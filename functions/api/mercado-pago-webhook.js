@@ -30,12 +30,12 @@ export const onRequestPost = async ({ request, env }) => {
     return json({ ok: false, error: payment.message || "Erro ao consultar pagamento." });
   }
 
+  if (payment.payment_method_id !== "pix" && payment.payment_type_id !== "bank_transfer") {
+    return json({ ok: true, ignored: "disabled_payment_method" });
+  }
+
   const paymentStatus = mercadoPagoStatusToApp(payment.status);
-  const appPaymentMethod = payment.payment_method_id === "pix" || payment.payment_type_id === "bank_transfer"
-    ? "pix"
-    : payment.payment_type_id === "debit_card"
-      ? "debito"
-      : "credito";
+  const appPaymentMethod = "pix";
 
   await updateSupabaseOrderPayment(env, {
     orderId: payment.external_reference,

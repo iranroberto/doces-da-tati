@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Banknote, CheckCircle2, Clock, Copy, CreditCard, Heart, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
+import { ArrowLeft, Banknote, CheckCircle2, Clock, Copy, Heart, Loader2, MessageCircle, Package, QrCode } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
@@ -48,8 +48,6 @@ const PIX_PAYMENT_CHECK_INTERVAL_MS = 3000;
 const paymentOptions: Array<{ id: PaymentMethod; label: string; description: string; icon: typeof QrCode }> = [
   { id: "pix", label: "Pagamento via Pix", description: "", icon: QrCode },
   { id: "dinheiro", label: "Dinheiro", description: "Pagamento combinado na entrega", icon: Banknote },
-  { id: "credito", label: "Credito", description: "Cartao via Mercado Pago", icon: CreditCard },
-  { id: "debito", label: "Debito", description: "Cartao via Mercado Pago", icon: CreditCard },
 ];
 
 const formatPrice = (value: number) =>
@@ -127,6 +125,9 @@ const formatCountdown = (seconds: number) => {
   return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 };
 
+const normalizePaymentMethod = (method: unknown): PaymentMethod =>
+  method === "dinheiro" ? "dinheiro" : "pix";
+
 const Checkout = () => {
   const { config } = useStore();
   const navigate = useNavigate();
@@ -153,7 +154,13 @@ const Checkout = () => {
     setOrder(savedOrder);
 
     if (savedOrder?.paymentMethod) {
-      setSelectedPaymentMethod(savedOrder.paymentMethod as PaymentMethod);
+      const nextPaymentMethod = normalizePaymentMethod(savedOrder.paymentMethod);
+      setSelectedPaymentMethod(nextPaymentMethod);
+      if (nextPaymentMethod !== savedOrder.paymentMethod) {
+        const nextOrder = { ...savedOrder, paymentMethod: nextPaymentMethod };
+        setOrder(nextOrder);
+        savePendingCheckout(nextOrder);
+      }
     }
 
     if (savedOrder?.paymentStatus) {
@@ -514,44 +521,6 @@ const Checkout = () => {
     }
   };
 
-  const startCardPayment = async () => {
-    if (!order) return;
-
-    setIsProcessing(true);
-    try {
-      const savedOrder = await ensureRegisteredOrder(selectedPaymentMethod, "pendente");
-      const response = await fetch("/api/create-mercado-pago-preference", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: savedOrder.registeredOrderId,
-          total: savedOrder.total,
-          paymentMethod: selectedPaymentMethod,
-          customerName: savedOrder.customer?.name,
-          items: savedOrder.items,
-        }),
-      });
-      const result = await response.json();
-
-      if (!response.ok || !result.initPoint) {
-        throw new Error(result.error || "Nao foi possivel iniciar o Mercado Pago.");
-      }
-
-      const nextOrder = {
-        ...savedOrder,
-        transactionId: result.preferenceId,
-      };
-      setOrder(nextOrder);
-      savePendingCheckout(nextOrder);
-      window.location.href = result.initPoint;
-    } catch (error) {
-      console.error("Erro Mercado Pago:", error);
-      toast.error(error instanceof Error ? error.message : "Nao foi possivel iniciar o pagamento.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   if (!order || order.items.length === 0) {
     return (
       <main className="min-h-screen bg-background px-4 py-10">
@@ -568,7 +537,6 @@ const Checkout = () => {
   }
 
   const isPixPayment = selectedPaymentMethod === "pix";
-  const isCardPayment = selectedPaymentMethod === "credito" || selectedPaymentMethod === "debito";
   const isWaitingForPixPayment = Boolean(isPixPayment && pixPayment?.paymentId && paymentStatus === "pendente" && !isPixExpired);
 
   return (
@@ -684,12 +652,6 @@ const Checkout = () => {
             </div>
           )}
 
-          {(selectedPaymentMethod === "credito" || selectedPaymentMethod === "debito") && (
-            <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-              O pagamento sera processado em ambiente seguro do Mercado Pago.
-            </div>
-          )}
-
           {isPixPayment && pixPayment?.qrCode && (
             <div className="space-y-3 rounded-lg border border-border bg-muted/50 p-3">
               <div>
@@ -747,11 +709,6 @@ const Checkout = () => {
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing || paymentStatus === "aprovado" || isWaitingForPixPayment} onClick={() => void generatePixPayment()}>
               {isProcessing || isWaitingForPixPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
               {paymentStatus === "aprovado" ? "Pix aprovado" : isWaitingForPixPayment ? "Aguardando pagamento..." : "Gerar novo PIX"}
-            </Button>
-          ) : isCardPayment ? (
-            <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void startCardPayment()}>
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-              Pagar com Mercado Pago
             </Button>
           ) : (
             <Button className="h-11 w-full gap-2 font-bold" disabled={isProcessing} onClick={() => void confirmManualPayment()}>

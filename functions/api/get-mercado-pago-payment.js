@@ -140,11 +140,11 @@ export const onRequestGet = async ({ request, env }) => {
   let paymentStatus = mercadoPagoStatusToApp(payment.status);
   const resolvedOrderId = orderId || payment.external_reference;
   let paidAt = paymentStatus === "aprovado" ? payment.date_approved || new Date().toISOString() : null;
-  const appPaymentMethod = payment.payment_method_id === "pix" || payment.payment_type_id === "bank_transfer"
-    ? "pix"
-    : payment.payment_type_id === "debit_card"
-      ? "debito"
-      : "credito";
+  if (payment.payment_method_id !== "pix" && payment.payment_type_id !== "bank_transfer") {
+    return json({ error: "Forma de pagamento desativada." }, 400);
+  }
+
+  const appPaymentMethod = "pix";
 
   const updateResult = await updateSupabaseOrderPayment(env, {
     orderId: resolvedOrderId,

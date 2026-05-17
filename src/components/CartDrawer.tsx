@@ -1,4 +1,4 @@
-import { CreditCard, MessageCircle, Minus, Package, Plus, Trash2, UserRound } from "lucide-react";
+import { Banknote, MessageCircle, Minus, Package, Plus, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useStore } from "@/context/StoreContext";
@@ -115,7 +115,7 @@ const CartDrawer = ({ open, onClose, onCustomerAuthOpen }: CartDrawerProps) => {
                   <p className="text-muted-foreground">{customer.empresa_unidade}</p>
                   <div className="mt-2 flex items-center justify-between gap-3 rounded-md bg-background px-3 py-2">
                     <span className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
-                      <CreditCard className="h-4 w-4" />
+                      <Banknote className="h-4 w-4" />
                       Pagamento
                     </span>
                     <span className="text-right text-sm font-bold text-primary">Escolha no checkout</span>

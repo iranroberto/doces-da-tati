@@ -56,7 +56,7 @@ create table if not exists public.pedidos (
   cliente_id uuid references public.clientes(id) on delete set null,
   status text not null default 'aberto',
   total numeric not null default 0,
-  forma_pagamento text not null default 'pix' check (forma_pagamento in ('pix', 'dinheiro', 'credito', 'debito')),
+  forma_pagamento text not null default 'pix' check (forma_pagamento in ('pix', 'dinheiro')),
   status_pagamento text not null default 'pendente' check (status_pagamento in ('aprovado', 'pendente', 'recusado', 'cancelado')),
   transaction_id text,
   itens jsonb not null default '[]'::jsonb,
@@ -121,9 +121,13 @@ alter table public.pedidos
   add column if not exists estoque_baixado boolean not null default false,
   add column if not exists pago_em timestamptz;
 
+update public.pedidos
+set forma_pagamento = 'pix'
+where forma_pagamento in ('credito', 'debito');
+
 alter table public.pedidos
   drop constraint if exists pedidos_forma_pagamento_check,
-  add constraint pedidos_forma_pagamento_check check (forma_pagamento in ('pix', 'dinheiro', 'credito', 'debito'));
+  add constraint pedidos_forma_pagamento_check check (forma_pagamento in ('pix', 'dinheiro'));
 
 alter table public.pedidos
   drop constraint if exists pedidos_status_pagamento_check,
