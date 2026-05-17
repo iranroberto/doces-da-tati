@@ -350,7 +350,7 @@ const AdminDashboard = () => {
       .forEach(order => {
         const syncKey = order.transactionId || order.id;
         const lastSync = lastPaymentSyncById.current.get(syncKey) || 0;
-        if (now - lastSync < 60_000) return;
+        if (now - lastSync < 10_000) return;
 
         lastPaymentSyncById.current.set(syncKey, now);
         void syncMercadoPagoPayment(order, false);

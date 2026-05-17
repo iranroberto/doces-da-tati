@@ -120,14 +120,17 @@ export const onRequestGet = async ({ request, env }) => {
     }
   }
 
-  if (!payment) {
+  if (!payment || payment.status !== "approved") {
     const fallbackOrder = await getOrderFallbackData(env, orderId);
-    payment = await findApprovedPixByAmount({
+    const approvedFallbackPayment = await findApprovedPixByAmount({
       accessToken,
       orderId,
       total: requestedTotal || fallbackOrder.total,
       createdAt: requestedCreatedAt || fallbackOrder.createdAt,
     });
+    if (approvedFallbackPayment) {
+      payment = payment ? selectBestPayment([payment, approvedFallbackPayment]) : approvedFallbackPayment;
+    }
   }
 
   if (!payment) {
