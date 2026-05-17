@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, RefreshCw, Save, ShieldCheck, Store, Tags, Trash2, TrendingUp, Truck, Users, Wallet } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, TrendingUp, Truck, Users, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
@@ -1617,22 +1617,6 @@ const AdminDashboard = () => {
                               {order.transactionId && <p className="break-all text-xs text-[#d8c0a8]">Transacao: {order.transactionId}</p>}
                             </div>
                             <div className="flex flex-col gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full gap-2 border-blue-300 bg-transparent text-blue-100 hover:bg-blue-950/40 hover:text-blue-50"
-                                disabled={
-                                  verifyingPaymentId === order.id
-                                  || deletingOrderId === order.id
-                                  || updatingOrderStatusId === order.id
-                                  || order.paymentMethod !== "pix"
-                                  || order.paymentStatus === "aprovado"
-                                }
-                                onClick={() => void syncMercadoPagoPayment(order)}
-                              >
-                                <RefreshCw className={verifyingPaymentId === order.id ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-                                Verificar Pix
-                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
