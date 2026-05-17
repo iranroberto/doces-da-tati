@@ -1,0 +1,25 @@
+{
+  "name": "Doces da Tati",
+  "short_name": "Doces da Tati",
+  "description": "Acompanhe pedidos e faca compras na Doces da Tati.",
+  "start_url": "/meus-pedidos",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f0d8c0",
+  "theme_color": "#481800",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo-doces-da-tati-round.png?v=20260507-2",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-doces-da-tati-round.png?v=20260507-2",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
