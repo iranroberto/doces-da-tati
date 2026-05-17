@@ -31,6 +31,10 @@ const getInstagramUrl = (value: string) => {
   return username ? `https://instagram.com/${username}` : "";
 };
 
+const isIosDevice = () =>
+  /iphone|ipad|ipod/i.test(window.navigator.userAgent)
+  || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+
 const Index = () => {
   const { config, categories, products } = useStore();
   const [cartOpen, setCartOpen] = useState(false);
@@ -40,6 +44,7 @@ const Index = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [isIos, setIsIos] = useState(false);
 
   const visibleCategories = useMemo(() => categories.filter(category => category.isActive), [categories]);
   const instagramUrl = useMemo(() => getInstagramUrl(config.instagram), [config.instagram]);
@@ -71,6 +76,7 @@ const Index = () => {
     const standalone = window.matchMedia("(display-mode: standalone)").matches
       || ("standalone" in window.navigator && Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone));
     setIsStandalone(standalone);
+    setIsIos(isIosDevice());
 
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -102,7 +108,6 @@ const Index = () => {
 
   const handleInstallApp = async () => {
     if (!installPrompt) {
-      toast.info("No iPhone, use Compartilhar e Adicionar a Tela de Inicio. No Android, abra no Chrome e tente novamente.");
       return;
     }
 
@@ -126,12 +131,18 @@ const Index = () => {
           <div className="container mx-auto flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-bold text-foreground">Instalar aplicativo</p>
-              <p className="mt-1 text-sm text-muted-foreground">Abra a loja direto pelo app da Doces da Tati.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isIos
+                  ? "No iPhone, toque em Compartilhar e depois em Adicionar a Tela de Inicio."
+                  : "Abra a loja direto pelo app da Doces da Tati."}
+              </p>
             </div>
-            <Button className="h-11 gap-2 font-bold sm:w-auto" onClick={() => void handleInstallApp()}>
-              <Download className="h-4 w-4" />
-              Baixar app
-            </Button>
+            {installPrompt && (
+              <Button className="h-11 gap-2 font-bold sm:w-auto" onClick={() => void handleInstallApp()}>
+                <Download className="h-4 w-4" />
+                Baixar app
+              </Button>
+            )}
           </div>
         </section>
       )}

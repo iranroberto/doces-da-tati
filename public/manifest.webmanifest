@@ -2,7 +2,7 @@
   "name": "Doces da Tati",
   "short_name": "Doces da Tati",
   "description": "Acompanhe pedidos e faca compras na Doces da Tati.",
-  "start_url": "/meus-pedidos",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f0d8c0",
