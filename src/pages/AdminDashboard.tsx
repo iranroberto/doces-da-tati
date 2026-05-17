@@ -1553,10 +1553,11 @@ const AdminDashboard = () => {
                 <h1 className="font-display text-4xl text-[#f0d8c0]">Pedidos</h1>
                 <p className="text-sm font-semibold text-[#d8c0a8]">Pedidos organizados por cliente, valor, data e entrega.</p>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
                 <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{orders.length} pedido(s)</span>
                 <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-green-300">{orders.filter(order => order.status === "entregue").length} entregue(s)</span>
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{orders.filter(order => order.status !== "entregue").length} pendente(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{orders.filter(order => order.status !== "entregue").length} a entregar</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{orders.filter(order => order.paymentStatus === "pendente").length} pagamento(s) pendente(s)</span>
               </div>
             </div>
 
