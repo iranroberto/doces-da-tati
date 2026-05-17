@@ -87,9 +87,9 @@ export const onRequestGet = async ({ request, env }) => {
     paidAt,
   });
 
-  if (updateResult && !updateResult.ok) {
-    return json({ error: updateResult.error || "Pagamento consultado, mas nao foi possivel atualizar o pedido." }, 500);
-  }
+  const updateWarning = updateResult && !updateResult.ok
+    ? updateResult.error || "Pagamento consultado, mas nao foi possivel atualizar o pedido."
+    : "";
 
   return json({
     paymentId: String(payment.id),
@@ -97,7 +97,9 @@ export const onRequestGet = async ({ request, env }) => {
     paymentMethod: appPaymentMethod,
     status: paymentStatus,
     rawStatus: payment.status,
+    statusDetail: payment.status_detail || "",
     paidAt,
+    updateWarning,
   });
 };
 
