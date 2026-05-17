@@ -1,4 +1,4 @@
-import { corsHeaders, getMercadoPagoCredentials, json, mercadoPagoStatusToApp, updateSupabaseOrderPayment } from "../_shared.js";
+import { corsHeaders, fetchSupabaseRows, getMercadoPagoCredentials, json, mercadoPagoStatusToApp, updateSupabaseOrderPayment } from "../_shared.js";
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders });
 
@@ -18,6 +18,58 @@ const selectBestPayment = (payments) => {
   })[0];
 };
 
+const moneyEquals = (a, b) => Math.round(Number(a || 0) * 100) === Math.round(Number(b || 0) * 100);
+
+const getOrderFallbackData = async (env, orderId) => {
+  if (!orderId) return {};
+
+  const { data } = await fetchSupabaseRows(
+    env,
+    `pedidos?id=eq.${encodeURIComponent(orderId)}&select=total,criado_em&limit=1`,
+  );
+  const row = Array.isArray(data) ? data[0] : null;
+
+  return {
+    total: Number(row?.total || 0),
+    createdAt: row?.criado_em ? String(row.criado_em) : "",
+  };
+};
+
+const findApprovedPixByAmount = async ({ accessToken, orderId, total, createdAt }) => {
+  if (!total || total <= 0) return null;
+
+  const createdTime = createdAt ? new Date(createdAt).getTime() : Date.now();
+  const safeCreatedTime = Number.isNaN(createdTime) ? Date.now() : createdTime;
+  const beginDate = new Date(safeCreatedTime - 10 * 60 * 1000).toISOString();
+  const endDate = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const query = new URLSearchParams({
+    sort: "date_created",
+    criteria: "desc",
+    range: "date_created",
+    begin_date: beginDate,
+    end_date: endDate,
+    status: "approved",
+    payment_method_id: "pix",
+    limit: "50",
+  });
+
+  const response = await fetch(`https://api.mercadopago.com/v1/payments/search?${query.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const result = await response.json();
+  if (!response.ok || !Array.isArray(result.results)) return null;
+
+  const matches = result.results.filter(payment => {
+    const reference = String(payment.external_reference || "");
+    return payment.status === "approved"
+      && (payment.payment_method_id === "pix" || payment.payment_type_id === "bank_transfer")
+      && moneyEquals(payment.transaction_amount, total)
+      && (!reference || reference === orderId);
+  });
+
+  return selectBestPayment(matches);
+};
+
 export const onRequestGet = async ({ request, env }) => {
   const { accessToken } = await getMercadoPagoCredentials(env);
   if (!accessToken) return json({ error: "MERCADO_PAGO_ACCESS_TOKEN nao configurado." }, 500);
@@ -25,6 +77,8 @@ export const onRequestGet = async ({ request, env }) => {
   const url = new URL(request.url);
   const paymentId = url.searchParams.get("payment_id") || url.searchParams.get("collection_id");
   const orderId = url.searchParams.get("order_id") || url.searchParams.get("external_reference");
+  const requestedTotal = Number(url.searchParams.get("total") || 0);
+  const requestedCreatedAt = url.searchParams.get("created_at") || "";
 
   if (!paymentId && !orderId) return json({ error: "payment_id ou order_id obrigatorio." }, 400);
 
@@ -64,6 +118,16 @@ export const onRequestGet = async ({ request, env }) => {
     } else {
       return json({ error: paymentById?.message || "Erro ao consultar pagamento.", details: paymentById }, response.status);
     }
+  }
+
+  if (!payment) {
+    const fallbackOrder = await getOrderFallbackData(env, orderId);
+    payment = await findApprovedPixByAmount({
+      accessToken,
+      orderId,
+      total: requestedTotal || fallbackOrder.total,
+      createdAt: requestedCreatedAt || fallbackOrder.createdAt,
+    });
   }
 
   if (!payment) {

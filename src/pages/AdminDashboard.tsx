@@ -294,6 +294,8 @@ const AdminDashboard = () => {
     try {
       const query = new URLSearchParams({ order_id: order.id });
       if (order.transactionId) query.set("payment_id", order.transactionId);
+      if (order.total) query.set("total", String(order.total));
+      if (order.createdAt) query.set("created_at", order.createdAt);
       const response = await fetch(`/api/get-mercado-pago-payment?${query.toString()}`);
       const result = await readApiJson(response);
 

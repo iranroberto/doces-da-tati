@@ -236,6 +236,8 @@ const Checkout = () => {
     try {
       const query = new URLSearchParams({ order_id: orderId });
       if (paymentId) query.set("payment_id", paymentId);
+      if (order?.total) query.set("total", String(order.total));
+      if (order?.createdAt) query.set("created_at", order.createdAt);
       const response = await fetch(`/api/get-mercado-pago-payment?${query.toString()}`);
       const result = await readApiJson(response);
 
