@@ -137,9 +137,9 @@ export const onRequestGet = async ({ request, env }) => {
     return json({ error: "Pagamento ainda nao encontrado para este pedido." }, 404);
   }
 
-  const paymentStatus = mercadoPagoStatusToApp(payment.status);
+  let paymentStatus = mercadoPagoStatusToApp(payment.status);
   const resolvedOrderId = orderId || payment.external_reference;
-  const paidAt = paymentStatus === "aprovado" ? payment.date_approved || new Date().toISOString() : null;
+  let paidAt = paymentStatus === "aprovado" ? payment.date_approved || new Date().toISOString() : null;
   const appPaymentMethod = payment.payment_method_id === "pix" || payment.payment_type_id === "bank_transfer"
     ? "pix"
     : payment.payment_type_id === "debit_card"
@@ -153,6 +153,11 @@ export const onRequestGet = async ({ request, env }) => {
     transactionId: String(payment.id),
     paidAt,
   });
+
+  if (updateResult?.skipped === "already_approved") {
+    paymentStatus = "aprovado";
+    paidAt = payment.date_approved || new Date().toISOString();
+  }
 
   const updateWarning = updateResult && !updateResult.ok
     ? updateResult.error || "Pagamento consultado, mas nao foi possivel atualizar o pedido."

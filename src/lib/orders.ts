@@ -202,29 +202,48 @@ export const updateOrderPayment = async (
 ) => {
   const paymentStatus = updates.paymentStatus ? normalizePaymentStatus(updates.paymentStatus) : undefined;
   const paidAt = paymentStatus === "aprovado" ? updates.paidAt || new Date().toISOString() : updates.paidAt;
+  let currentSupabaseStatus: PaymentStatus | undefined;
 
   if (supabase && isUuid(orderId)) {
-    const { error } = await supabase
+    const currentResult = await supabase
       .from("pedidos")
-      .update({
-        forma_pagamento: updates.paymentMethod,
-        status_pagamento: paymentStatus,
-        transaction_id: updates.transactionId || null,
-        pago_em: paidAt || null,
-      })
-      .eq("id", orderId);
+      .select("status_pagamento")
+      .eq("id", orderId)
+      .maybeSingle();
 
-    if (error && !isMissingOrdersTableError(error) && !isMissingPaymentColumnsError(error)) throw error;
+    if (!currentResult.error && currentResult.data?.status_pagamento) {
+      currentSupabaseStatus = normalizePaymentStatus(currentResult.data.status_pagamento);
+    }
+
+    if (!(currentSupabaseStatus === "aprovado" && paymentStatus && paymentStatus !== "aprovado")) {
+      const { error } = await supabase
+        .from("pedidos")
+        .update({
+          forma_pagamento: updates.paymentMethod,
+          status_pagamento: paymentStatus,
+          transaction_id: updates.transactionId || null,
+          pago_em: paidAt || null,
+        })
+        .eq("id", orderId);
+
+      if (error && !isMissingOrdersTableError(error) && !isMissingPaymentColumnsError(error)) throw error;
+    }
   }
 
   const orders = loadLocalOrders();
   localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(orders.map(order => {
     if (order.id !== orderId) return order;
 
+    const nextPaymentStatus = order.paymentStatus === "aprovado" && paymentStatus && paymentStatus !== "aprovado"
+      ? "aprovado"
+      : currentSupabaseStatus === "aprovado" && paymentStatus && paymentStatus !== "aprovado"
+        ? "aprovado"
+        : paymentStatus ?? order.paymentStatus;
+
     return {
       ...order,
       paymentMethod: updates.paymentMethod ?? order.paymentMethod,
-      paymentStatus: paymentStatus ?? order.paymentStatus,
+      paymentStatus: nextPaymentStatus,
       transactionId: updates.transactionId ?? order.transactionId,
       paidAt: paidAt ?? order.paidAt,
     };
