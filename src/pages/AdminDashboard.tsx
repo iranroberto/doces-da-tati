@@ -251,6 +251,7 @@ const AdminDashboard = () => {
   const [verifyingPaymentId, setVerifyingPaymentId] = useState("");
   const [deletingOrderId, setDeletingOrderId] = useState("");
   const lastPaymentSyncById = useRef(new Map<string, number>());
+  const ordersByIdRef = useRef(new Map<string, AdminOrder>());
 
   const buildProductData = (productId: string): { product?: Product; error?: string } => {
     const price = Number(pPrice);
@@ -320,8 +321,10 @@ const AdminDashboard = () => {
           ? {
               ...item,
               paymentMethod: nextPaymentMethod,
-              paymentStatus: nextStatus,
-              transactionId: nextTransactionId,
+              paymentStatus: item.paymentStatus === "aprovado" && nextStatus !== "aprovado" ? "aprovado" : nextStatus,
+              transactionId: item.paymentStatus === "aprovado" && nextStatus !== "aprovado"
+                ? item.transactionId || nextTransactionId
+                : nextTransactionId,
             }
           : item
       )));
@@ -356,6 +359,10 @@ const AdminDashboard = () => {
         void syncMercadoPagoPayment(order, false);
       });
   }, [syncMercadoPagoPayment]);
+
+  useEffect(() => {
+    ordersByIdRef.current = new Map(orders.map(order => [order.id, order]));
+  }, [orders]);
 
   useEffect(() => {
     if (storeFormDirty) return;
@@ -525,7 +532,17 @@ const AdminDashboard = () => {
         if (error) throw error;
         if (!isMounted) return;
 
-        const mappedOrders = mapOrderRows(data ?? []);
+        const currentOrdersById = ordersByIdRef.current;
+        const mappedOrders = mapOrderRows(data ?? []).map(order => {
+          const currentOrder = currentOrdersById.get(order.id);
+          if (currentOrder?.paymentStatus !== "aprovado" || order.paymentStatus === "aprovado") return order;
+
+          return {
+            ...order,
+            paymentStatus: "aprovado" as PaymentStatus,
+            transactionId: order.transactionId || currentOrder.transactionId,
+          };
+        });
         setOrders(mappedOrders);
         syncPendingPixOrders(mappedOrders);
       } catch (error) {
