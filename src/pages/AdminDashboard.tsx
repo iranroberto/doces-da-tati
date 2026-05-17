@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, Save, ShieldCheck, Store, Tags, Trash2, TrendingUp, Truck, Users, Wallet } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, CheckCircle2, ClipboardList, Clock, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, Save, Send, ShieldCheck, Store, Tags, Trash2, TrendingUp, Truck, Users, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
@@ -245,6 +245,10 @@ const AdminDashboard = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [deletingCustomerId, setDeletingCustomerId] = useState("");
+  const [pushTitle, setPushTitle] = useState("Doces da Tati");
+  const [pushMessage, setPushMessage] = useState("");
+  const [pushUrl, setPushUrl] = useState("/");
+  const [sendingPush, setSendingPush] = useState(false);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [updatingOrderStatusId, setUpdatingOrderStatusId] = useState("");
@@ -945,6 +949,40 @@ const AdminDashboard = () => {
       toast.error("Nao foi possivel excluir o cliente.");
     } finally {
       setDeletingCustomerId("");
+    }
+  };
+
+  const sendPushBroadcast = async () => {
+    if (!pushMessage.trim()) {
+      toast.error("Escreva uma descricao para enviar.");
+      return;
+    }
+
+    setSendingPush(true);
+
+    try {
+      const response = await fetch("/api/push-broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: adminPw,
+          title: pushTitle,
+          body: pushMessage,
+          url: pushUrl,
+        }),
+      });
+      const result = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(apiErrorMessage(result, "Nao foi possivel enviar as notificacoes."));
+      }
+
+      toast.success(`Mensagem enviada para ${Number(result.sent || 0)} dispositivo(s).`);
+      setPushMessage("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel enviar as notificacoes.");
+    } finally {
+      setSendingPush(false);
     }
   };
 
@@ -1674,6 +1712,51 @@ const AdminDashboard = () => {
         {tab === "clients" && (
           <div className="space-y-6">
             <h1 className="font-display text-4xl text-[#f0d8c0]">Clientes</h1>
+            <Card className="rounded-lg border-[#603000] bg-[#481800] text-[#f0d8c0]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Enviar aviso em massa
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
+                  <div>
+                    <Label>Titulo</Label>
+                    <Input
+                      value={pushTitle}
+                      maxLength={80}
+                      onChange={event => setPushTitle(event.target.value)}
+                      className="border-[#603000] bg-[#301000] text-[#f0d8c0]"
+                    />
+                  </div>
+                  <div>
+                    <Label>Destino</Label>
+                    <Input
+                      value={pushUrl}
+                      onChange={event => setPushUrl(event.target.value)}
+                      placeholder="/"
+                      className="border-[#603000] bg-[#301000] text-[#f0d8c0]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Descricao</Label>
+                  <Textarea
+                    value={pushMessage}
+                    maxLength={240}
+                    onChange={event => setPushMessage(event.target.value)}
+                    placeholder="Ex: Temos promoção de brigadeiro hoje ate acabar o estoque."
+                    className="min-h-28 border-[#603000] bg-[#301000] text-[#f0d8c0] placeholder:text-[#d8c0a8]"
+                  />
+                  <p className="mt-1 text-xs text-[#d8c0a8]">{pushMessage.length}/240 caracteres</p>
+                </div>
+                <Button className="w-full gap-2" disabled={sendingPush} onClick={() => void sendPushBroadcast()}>
+                  <Send className="h-4 w-4" />
+                  {sendingPush ? "Enviando..." : "Enviar para clientes inscritos"}
+                </Button>
+              </CardContent>
+            </Card>
             <div className="overflow-hidden rounded-[18px] border border-[#603000] bg-[#481800]">
               <div className="grid grid-cols-5 gap-4 border-b border-[#603000] px-5 py-4 text-sm font-bold uppercase text-[#f0d8a8]">
                 <span>Nome</span>

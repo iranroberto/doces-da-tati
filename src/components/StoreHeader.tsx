@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import { CakeSlice, LogOut, ReceiptText, ShoppingCart, UserRound } from "lucide-react";
+import { Bell, CakeSlice, LogOut, ReceiptText, ShoppingCart, UserRound } from "lucide-react";
+import { toast } from "sonner";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useStore } from "@/context/StoreContext";
+import { canUsePushNotifications, getPushPermission, subscribeToPushNotifications } from "@/lib/pushNotifications";
 import { Button } from "@/components/ui/button";
 
 interface StoreHeaderProps {
@@ -19,6 +22,26 @@ const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
   const scriptName = match?.[2] || config.name;
   const hasBanner = Boolean(config.bannerImage);
   const customerName = customer?.nome.trim() || "Cliente";
+  const [pushPermission, setPushPermission] = useState(getPushPermission());
+  const [isEnablingPush, setIsEnablingPush] = useState(false);
+
+  useEffect(() => {
+    setPushPermission(getPushPermission());
+  }, [customer?.id]);
+
+  const enablePushNotifications = async () => {
+    setIsEnablingPush(true);
+
+    try {
+      await subscribeToPushNotifications(customer?.id);
+      setPushPermission(getPushPermission());
+      toast.success("Notificacoes ativadas.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel ativar notificacoes.");
+    } finally {
+      setIsEnablingPush(false);
+    }
+  };
 
   return (
     <header
@@ -88,6 +111,17 @@ const StoreHeader = ({ onCartOpen, onCustomerAuthOpen }: StoreHeaderProps) => {
                   <span className="hidden md:inline">Meus pedidos</span>
                 </Link>
               </Button>
+              {canUsePushNotifications() && pushPermission !== "granted" && (
+                <Button
+                  variant="ghost"
+                  className="gap-2 px-2 text-primary-foreground hover:bg-primary-foreground/20"
+                  disabled={isEnablingPush || pushPermission === "denied"}
+                  onClick={() => void enablePushNotifications()}
+                >
+                  <Bell className="h-5 w-5" />
+                  <span className="hidden md:inline">Avisos</span>
+                </Button>
+              )}
               <Button variant="ghost" className="max-w-36 gap-2 px-2 text-primary-foreground hover:bg-primary-foreground/20 sm:hidden" onClick={logoutCustomer} aria-label="Sair da conta">
                 <UserRound className="h-5 w-5" />
                 <span className="min-w-0 truncate text-xs font-bold">{customerName.split(" ")[0] || customerName}</span>

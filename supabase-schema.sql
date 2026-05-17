@@ -94,6 +94,25 @@ create table if not exists public.mercado_pago_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  cliente_id uuid references public.clientes(id) on delete set null,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text not null default '',
+  criado_em timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.push_broadcasts (
+  id uuid primary key default gen_random_uuid(),
+  title text not null default 'Doces da Tati',
+  body text not null,
+  url text not null default '/',
+  created_at timestamptz not null default now()
+);
+
 alter table public.products
   add column if not exists category_id text not null default '';
 
@@ -143,6 +162,8 @@ alter table public.pedidos enable row level security;
 alter table public.pagamentos enable row level security;
 alter table public.product_ratings enable row level security;
 alter table public.mercado_pago_settings enable row level security;
+alter table public.push_subscriptions enable row level security;
+alter table public.push_broadcasts enable row level security;
 
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.store_config to anon, authenticated;
@@ -153,6 +174,8 @@ grant select, insert, update, delete on public.pedidos to anon, authenticated;
 grant select, insert, update, delete on public.pagamentos to anon, authenticated;
 grant select, insert, update, delete on public.product_ratings to anon, authenticated;
 revoke all on public.mercado_pago_settings from anon, authenticated;
+grant select, insert, update, delete on public.push_subscriptions to anon, authenticated;
+grant select, insert, update, delete on public.push_broadcasts to anon, authenticated;
 
 drop policy if exists "Public can read store config" on public.store_config;
 drop policy if exists "Public can write store config" on public.store_config;
@@ -168,6 +191,10 @@ drop policy if exists "Public can read payments" on public.pagamentos;
 drop policy if exists "Public can write payments" on public.pagamentos;
 drop policy if exists "Public can read product ratings" on public.product_ratings;
 drop policy if exists "Public can write product ratings" on public.product_ratings;
+drop policy if exists "Public can read push subscriptions" on public.push_subscriptions;
+drop policy if exists "Public can write push subscriptions" on public.push_subscriptions;
+drop policy if exists "Public can read push broadcasts" on public.push_broadcasts;
+drop policy if exists "Public can write push broadcasts" on public.push_broadcasts;
 
 create policy "Public can read store config"
   on public.store_config for select
@@ -229,6 +256,24 @@ create policy "Public can read product ratings"
 
 create policy "Public can write product ratings"
   on public.product_ratings for all
+  using (true)
+  with check (true);
+
+create policy "Public can read push subscriptions"
+  on public.push_subscriptions for select
+  using (true);
+
+create policy "Public can write push subscriptions"
+  on public.push_subscriptions for all
+  using (true)
+  with check (true);
+
+create policy "Public can read push broadcasts"
+  on public.push_broadcasts for select
+  using (true);
+
+create policy "Public can write push broadcasts"
+  on public.push_broadcasts for all
   using (true)
   with check (true);
 
