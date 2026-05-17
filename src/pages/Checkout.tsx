@@ -635,6 +635,22 @@ const Checkout = () => {
             </div>
           )}
 
+          {paymentStatus === "recusado" && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-900">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-red-600 text-white">
+                  <Clock className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-display text-lg font-bold">Pagamento recusado</p>
+                  <p className="mt-1 text-sm">
+                    O banco/PSP nao aprovou esse Pix. Gere um novo Pix ou combine outra forma de pagamento.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <p className="mb-2 text-sm font-bold">Forma de pagamento</p>
             <div className="grid grid-cols-2 gap-2">
