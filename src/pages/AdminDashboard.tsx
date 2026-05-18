@@ -28,6 +28,7 @@ const formatPrice = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
 const LOCAL_CUSTOMERS_KEY = "store_customers";
+const ADMIN_APPROVED_PAYMENT_IDS_KEY = "admin_approved_payment_ids";
 const BANNER_RECOMMENDED_WIDTH = 1600;
 const BANNER_RECOMMENDED_HEIGHT = 340;
 
@@ -51,6 +52,20 @@ const keepApprovedPaymentStatus = (
 ): PaymentStatus => (
   previousStatus === "aprovado" && nextStatus !== "aprovado" ? "aprovado" : nextStatus
 );
+
+const loadApprovedPaymentIds = () => {
+  try {
+    const raw = localStorage.getItem(ADMIN_APPROVED_PAYMENT_IDS_KEY);
+    const ids = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(ids) ? ids.map(String).filter(Boolean) : []);
+  } catch {
+    return new Set<string>();
+  }
+};
+
+const saveApprovedPaymentIds = (ids: Set<string>) => {
+  localStorage.setItem(ADMIN_APPROVED_PAYMENT_IDS_KEY, JSON.stringify(Array.from(ids)));
+};
 
 interface AdminOrder {
   id: string;
@@ -83,7 +98,7 @@ const saveLocalCustomers = (customers: Customer[]) => {
   localStorage.setItem(LOCAL_CUSTOMERS_KEY, JSON.stringify(customers));
 };
 
-const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
+const mapOrderRows = (rows: Record<string, unknown>[], approvedPaymentIds = new Set<string>()): AdminOrder[] => {
   const localOrders = loadLocalOrders();
   const localOrdersById = new Map(localOrders.map(order => [order.id, order]));
 
@@ -95,6 +110,7 @@ const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
       ? String(customer[0]?.nome ?? "")
       : String(customer?.nome ?? "");
     const paymentStatus = normalizePaymentStatus(row.status_pagamento ?? localOrder?.paymentStatus);
+    const previousStatus = approvedPaymentIds.has(id) ? "aprovado" : localOrder?.paymentStatus;
 
     return {
       id,
@@ -103,7 +119,7 @@ const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
       total: Number(row.total ?? 0),
       status: String(row.status ?? "aberto"),
       paymentMethod: String(row.forma_pagamento ?? localOrder?.paymentMethod ?? "pix"),
-      paymentStatus: keepApprovedPaymentStatus(paymentStatus, localOrder?.paymentStatus),
+      paymentStatus: keepApprovedPaymentStatus(paymentStatus, previousStatus),
       transactionId: String(row.transaction_id ?? localOrder?.transactionId ?? ""),
       items: parseOrderItems(row.itens ?? localOrder?.items),
     };
@@ -119,7 +135,7 @@ const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
       total: order.total,
       status: order.status,
       paymentMethod: order.paymentMethod,
-      paymentStatus: normalizePaymentStatus(order.paymentStatus),
+      paymentStatus: keepApprovedPaymentStatus(normalizePaymentStatus(order.paymentStatus), approvedPaymentIds.has(order.id) ? "aprovado" : undefined),
       transactionId: order.transactionId,
       items: order.items,
     }));
@@ -263,6 +279,14 @@ const AdminDashboard = () => {
   const [deletingOrderId, setDeletingOrderId] = useState("");
   const lastPaymentSyncById = useRef(new Map<string, number>());
   const ordersByIdRef = useRef(new Map<string, AdminOrder>());
+  const approvedPaymentIdsRef = useRef(loadApprovedPaymentIds());
+
+  const rememberApprovedPayment = useCallback((orderId: string) => {
+    if (!orderId) return;
+
+    approvedPaymentIdsRef.current.add(orderId);
+    saveApprovedPaymentIds(approvedPaymentIdsRef.current);
+  }, []);
 
   const buildProductData = (productId: string): { product?: Product; error?: string } => {
     const price = Number(pPrice);
@@ -320,6 +344,10 @@ const AdminDashboard = () => {
       const nextTransactionId = String(result.paymentId || order.transactionId);
       const paidAt = result.paidAt ? String(result.paidAt) : undefined;
 
+      if (nextStatus === "aprovado") {
+        rememberApprovedPayment(order.id);
+      }
+
       await updateOrderPayment(order.id, {
         paymentMethod: nextPaymentMethod,
         paymentStatus: nextStatus,
@@ -353,7 +381,7 @@ const AdminDashboard = () => {
     } finally {
       if (showToast) setVerifyingPaymentId("");
     }
-  }, []);
+  }, [rememberApprovedPayment]);
 
   const syncPendingPixOrders = useCallback((nextOrders: AdminOrder[]) => {
     const now = Date.now();
@@ -544,14 +572,18 @@ const AdminDashboard = () => {
         if (!isMounted) return;
 
         const currentOrdersById = ordersByIdRef.current;
-        const mappedOrders = mapOrderRows(data ?? []).map(order => {
+        const mappedOrders = mapOrderRows(data ?? [], approvedPaymentIdsRef.current).map(order => {
           const currentOrder = currentOrdersById.get(order.id);
+          const previousStatus = approvedPaymentIdsRef.current.has(order.id) ? "aprovado" : currentOrder?.paymentStatus;
           return {
             ...order,
-            paymentStatus: keepApprovedPaymentStatus(order.paymentStatus, currentOrder?.paymentStatus),
+            paymentStatus: keepApprovedPaymentStatus(order.paymentStatus, previousStatus),
             transactionId: order.transactionId || currentOrder?.transactionId || "",
           };
         });
+        mappedOrders
+          .filter(order => order.paymentStatus === "aprovado")
+          .forEach(order => rememberApprovedPayment(order.id));
         setOrders(mappedOrders);
         syncPendingPixOrders(mappedOrders);
       } catch (error) {
@@ -583,7 +615,7 @@ const AdminDashboard = () => {
       window.removeEventListener("focus", refreshOrders);
       if (channel) void supabase?.removeChannel(channel);
     };
-  }, [syncPendingPixOrders, tab]);
+  }, [rememberApprovedPayment, syncPendingPixOrders, tab]);
 
   const orderGroups = useMemo<CustomerOrderGroup[]>(() => {
     const groups = new Map<string, CustomerOrderGroup>();
@@ -633,7 +665,11 @@ const AdminDashboard = () => {
   ), [orders]);
 
   const pendingPaymentOrders = useMemo(() => (
-    orders.filter(order => order.paymentStatus === "pendente")
+    orders.filter(order => (
+      order.paymentMethod === "pix"
+      && order.paymentStatus === "pendente"
+      && Boolean(order.transactionId)
+    ))
   ), [orders]);
 
   const averageTicket = orders.length ? totalRevenue / orders.length : 0;
@@ -1619,7 +1655,7 @@ const AdminDashboard = () => {
                 <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{orders.length} pedido(s)</span>
                 <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-green-300">{orders.filter(order => order.status === "entregue").length} entregue(s)</span>
                 <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{orders.filter(order => order.status !== "entregue").length} a entregar</span>
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{orders.filter(order => order.paymentStatus === "pendente").length} pagamento(s) pendente(s)</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{pendingPaymentOrders.length} pagamento(s) pendente(s)</span>
               </div>
             </div>
 
