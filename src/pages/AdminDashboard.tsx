@@ -45,6 +45,13 @@ const readApiJson = async (response: Response) => {
 const apiErrorMessage = (result: Record<string, unknown>, fallback: string) =>
   String(result.error || result.message || fallback);
 
+const keepApprovedPaymentStatus = (
+  nextStatus: PaymentStatus,
+  previousStatus?: PaymentStatus,
+): PaymentStatus => (
+  previousStatus === "aprovado" && nextStatus !== "aprovado" ? "aprovado" : nextStatus
+);
+
 interface AdminOrder {
   id: string;
   createdAt: string;
@@ -87,6 +94,7 @@ const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
     const customerName = Array.isArray(customer)
       ? String(customer[0]?.nome ?? "")
       : String(customer?.nome ?? "");
+    const paymentStatus = normalizePaymentStatus(row.status_pagamento ?? localOrder?.paymentStatus);
 
     return {
       id,
@@ -95,7 +103,7 @@ const mapOrderRows = (rows: Record<string, unknown>[]): AdminOrder[] => {
       total: Number(row.total ?? 0),
       status: String(row.status ?? "aberto"),
       paymentMethod: String(row.forma_pagamento ?? localOrder?.paymentMethod ?? "pix"),
-      paymentStatus: normalizePaymentStatus(row.status_pagamento ?? localOrder?.paymentStatus),
+      paymentStatus: keepApprovedPaymentStatus(paymentStatus, localOrder?.paymentStatus),
       transactionId: String(row.transaction_id ?? localOrder?.transactionId ?? ""),
       items: parseOrderItems(row.itens ?? localOrder?.items),
     };
@@ -324,7 +332,7 @@ const AdminDashboard = () => {
           ? {
               ...item,
               paymentMethod: nextPaymentMethod,
-              paymentStatus: item.paymentStatus === "aprovado" && nextStatus !== "aprovado" ? "aprovado" : nextStatus,
+              paymentStatus: keepApprovedPaymentStatus(nextStatus, item.paymentStatus),
               transactionId: item.paymentStatus === "aprovado" && nextStatus !== "aprovado"
                 ? item.transactionId || nextTransactionId
                 : nextTransactionId,
@@ -538,12 +546,10 @@ const AdminDashboard = () => {
         const currentOrdersById = ordersByIdRef.current;
         const mappedOrders = mapOrderRows(data ?? []).map(order => {
           const currentOrder = currentOrdersById.get(order.id);
-          if (currentOrder?.paymentStatus !== "aprovado" || order.paymentStatus === "aprovado") return order;
-
           return {
             ...order,
-            paymentStatus: "aprovado" as PaymentStatus,
-            transactionId: order.transactionId || currentOrder.transactionId,
+            paymentStatus: keepApprovedPaymentStatus(order.paymentStatus, currentOrder?.paymentStatus),
+            transactionId: order.transactionId || currentOrder?.transactionId || "",
           };
         });
         setOrders(mappedOrders);
