@@ -247,7 +247,6 @@ const AdminDashboard = () => {
   const [deletingCustomerId, setDeletingCustomerId] = useState("");
   const [pushTitle, setPushTitle] = useState("Doces da Tati");
   const [pushMessage, setPushMessage] = useState("");
-  const [pushUrl, setPushUrl] = useState("/");
   const [sendingPush, setSendingPush] = useState(false);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -968,7 +967,7 @@ const AdminDashboard = () => {
           password: adminPw,
           title: pushTitle,
           body: pushMessage,
-          url: pushUrl,
+          url: "/",
         }),
       });
       const result = await readApiJson(response);
@@ -1720,25 +1719,14 @@ const AdminDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
-                  <div>
-                    <Label>Titulo</Label>
-                    <Input
-                      value={pushTitle}
-                      maxLength={80}
-                      onChange={event => setPushTitle(event.target.value)}
-                      className="border-[#603000] bg-[#301000] text-[#f0d8c0]"
-                    />
-                  </div>
-                  <div>
-                    <Label>Destino</Label>
-                    <Input
-                      value={pushUrl}
-                      onChange={event => setPushUrl(event.target.value)}
-                      placeholder="/"
-                      className="border-[#603000] bg-[#301000] text-[#f0d8c0]"
-                    />
-                  </div>
+                <div>
+                  <Label>Titulo</Label>
+                  <Input
+                    value={pushTitle}
+                    maxLength={80}
+                    onChange={event => setPushTitle(event.target.value)}
+                    className="border-[#603000] bg-[#301000] text-[#f0d8c0]"
+                  />
                 </div>
                 <div>
                   <Label>Descricao</Label>
