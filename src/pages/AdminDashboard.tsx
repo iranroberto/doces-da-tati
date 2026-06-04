@@ -1045,7 +1045,6 @@ const AdminDashboard = () => {
     { label: "Pedidos hoje", value: String(todaysOrders.length), detail: `${orders.length} no total`, icon: ClipboardList },
     { label: "Faturamento pago", value: formatPrice(approvedRevenue), detail: `${formatPrice(totalRevenue)} em pedidos`, icon: DollarSign },
     { label: "Ticket medio", value: formatPrice(averageTicket), detail: orders.length ? "media por pedido" : "sem pedidos ainda", icon: TrendingUp },
-    { label: "Pedidos pendentes", value: String(orders.length), detail: "em preparo", icon: ClipboardList },
     { label: "Pagamentos pendentes", value: String(pendingPaymentOrders.length), detail: "aguardando confirmacao", icon: Clock },
     { label: "Clientes", value: String(customers.length), detail: `${activeProducts.length} produto(s) ativos`, icon: Users },
   ];
@@ -1176,11 +1175,6 @@ const AdminDashboard = () => {
                     <p className="mt-1 font-display text-3xl text-yellow-200">{lowStockProducts.length}</p>
                     <p className="mt-1 text-sm font-semibold text-[#d8c0a8]">produto(s) com 3 unidades ou menos</p>
                   </div>
-                  <div className="rounded-lg border border-[#603000] bg-[#220b00]/45 p-4">
-                    <p className="text-xs font-bold uppercase text-[#d8c0a8]">Pedidos pendentes</p>
-                    <p className="mt-1 font-display text-3xl text-yellow-200">{orders.length}</p>
-                    <p className="mt-1 text-sm font-semibold text-[#d8c0a8]">em preparo</p>
-                  </div>
                 </div>
               </section>
             </div>
@@ -1196,11 +1190,10 @@ const AdminDashboard = () => {
                     Ver todos
                   </Button>
                 </div>
-                <div className="grid grid-cols-4 gap-4 border-b border-[#603000] px-5 py-3 text-xs font-bold uppercase text-[#f0d8a8]">
+                <div className="grid grid-cols-3 gap-4 border-b border-[#603000] px-5 py-3 text-xs font-bold uppercase text-[#f0d8a8]">
                   <span>Data</span>
                   <span>Cliente</span>
                   <span>Total</span>
-                  <span>Status</span>
                 </div>
                 {recentOrders.length === 0 ? (
                   <div className="px-5 py-10 text-center text-sm text-[#d8c0a8]">
@@ -1209,13 +1202,10 @@ const AdminDashboard = () => {
                 ) : (
                   <div className="divide-y divide-[#603000]">
                     {recentOrders.map(order => (
-                      <div key={order.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-4 md:gap-4">
+                      <div key={order.id} className="grid grid-cols-1 gap-2 px-5 py-4 text-sm text-[#f0d8c0] md:grid-cols-3 md:gap-4">
                         <span className="font-bold">{formatDateTime(order.createdAt)}</span>
                         <span>{order.customerName}</span>
                         <span className="font-bold text-[#f0d8a8]">{formatPrice(order.total)}</span>
-                        <span className="font-bold text-yellow-200">
-                          Pendente
-                        </span>
                       </div>
                     ))}
                   </div>
@@ -1624,9 +1614,8 @@ const AdminDashboard = () => {
                 <h1 className="font-display text-4xl text-[#f0d8c0]">Pedidos</h1>
                 <p className="text-sm font-semibold text-[#d8c0a8]">Pedidos organizados por cliente, valor e data.</p>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
                 <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{orders.length} pedido(s)</span>
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{orders.length} pendente(s)</span>
                 <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{pendingPaymentOrders.length} pagamento(s) pendente(s)</span>
               </div>
             </div>
@@ -1650,15 +1639,12 @@ const AdminDashboard = () => {
                           {group.orders.length} pedido(s) - Total {formatPrice(group.total)}
                         </p>
                       </div>
-                      <span className="w-fit rounded-full bg-[#f0d8c0] px-3 py-1 text-sm font-bold text-[#481800]">
-                        {group.orders.length} pendente(s)
-                      </span>
                     </div>
 
                     <div className="divide-y divide-[#603000]">
                       {group.orders.map(order => {
                         return (
-                          <article key={order.id} className="grid grid-cols-1 gap-3 px-5 py-4 text-sm text-[#f0d8c0] lg:grid-cols-[1fr_1.5fr_0.8fr_1fr_1.1fr_auto] lg:items-center">
+                          <article key={order.id} className="grid grid-cols-1 gap-3 px-5 py-4 text-sm text-[#f0d8c0] lg:grid-cols-[1fr_1.5fr_0.8fr_1fr_auto] lg:items-center">
                             <div>
                               <p className="text-xs font-bold uppercase text-[#d8c0a8]">Data</p>
                               <p className="font-bold">{formatDateTime(order.createdAt)}</p>
@@ -1677,13 +1663,6 @@ const AdminDashboard = () => {
                               <p className={order.paymentStatus === "aprovado" ? "font-bold text-green-300" : order.paymentStatus === "recusado" ? "font-bold text-red-300" : "font-bold text-yellow-200"}>
                                 {order.paymentStatus}
                               </p>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold uppercase text-[#d8c0a8]">Pedido</p>
-                              <p className="font-bold text-yellow-200">
-                                Pendente
-                              </p>
-                              {order.transactionId && <p className="break-all text-xs text-[#d8c0a8]">Transacao: {order.transactionId}</p>}
                             </div>
                             <div className="flex flex-col gap-2">
                               <Button

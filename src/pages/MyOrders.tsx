@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Clock, Package, ReceiptText, Star, Truck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Package, ReceiptText, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
@@ -235,7 +235,6 @@ const MyOrders = () => {
 
   const totals = useMemo(() => ({
     paid: orders.filter(order => order.paymentStatus === "aprovado").length,
-    pending: orders.length,
   }), [orders]);
 
   const handleRateProduct = async (order: CustomerOrder, item: OrderItemDraft, rating: number) => {
@@ -292,7 +291,7 @@ const MyOrders = () => {
       </header>
 
       <div className="container mx-auto space-y-5 px-4 py-5">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-sm font-bold text-muted-foreground">Pedidos</p>
             <p className="mt-2 font-display text-3xl text-primary">{orders.length}</p>
@@ -300,10 +299,6 @@ const MyOrders = () => {
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-sm font-bold text-muted-foreground">Pagos</p>
             <p className="mt-2 font-display text-3xl text-green-700">{totals.paid}</p>
-          </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-sm font-bold text-muted-foreground">Pendentes</p>
-            <p className="mt-2 font-display text-3xl text-primary">{totals.pending}</p>
           </div>
         </div>
 
@@ -329,7 +324,7 @@ const MyOrders = () => {
                   <p className="font-bold text-primary">{formatPrice(order.total)}</p>
                 </div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto] md:items-start">
+                <div className="mt-3 grid gap-3">
                   <div>
                     <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Itens</p>
                     {order.items.length > 0 ? (
@@ -385,10 +380,6 @@ const MyOrders = () => {
                     >
                       {order.paymentStatus === "aprovado" ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
                       {order.paymentStatus === "aprovado" ? "Pago" : "Pagamento pendente"}
-                    </span>
-                    <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-sm font-bold text-muted-foreground">
-                      <Truck className="h-4 w-4" />
-                      Em preparo
                     </span>
                   </div>
                 </div>
