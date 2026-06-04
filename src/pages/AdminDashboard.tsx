@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
 import { useStore } from "@/context/StoreContext";
-import { deleteOrder, loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, updateOrderPayment, updateOrderStatus, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
+import { deleteOrder, loadLocalOrders, normalizePaymentStatus, parseOrderItems, paymentMethodLabel, updateOrderPayment, type OrderItemDraft, type PaymentStatus } from "@/lib/orders";
 import { getProductPrice, hasPromotionalPrice } from "@/lib/pricing";
 import { formatPhone } from "@/lib/phone";
 import { supabase } from "@/lib/supabase";
@@ -1032,7 +1032,21 @@ const AdminDashboard = () => {
     setUpdatingOrderStatusId(order.id);
 
     try {
-      await updateOrderStatus(order.id, nextStatus);
+      const response = await fetch("/api/order-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          status: nextStatus,
+          adminPassword: adminPw,
+        }),
+      });
+      const result = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(apiErrorMessage(result, "Nao foi possivel atualizar o pedido."));
+      }
+
       setOrders(current => current.map(item => (
         item.id === order.id ? { ...item, status: nextStatus } : item
       )));
