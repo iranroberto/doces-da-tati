@@ -1,4 +1,4 @@
-const CACHE_NAME = "doces-da-tati-v2";
+const CACHE_NAME = "doces-da-tati-v3";
 const APP_SHELL = [
   "/",
   "/meus-pedidos",
