@@ -235,7 +235,7 @@ const MyOrders = () => {
 
   const totals = useMemo(() => ({
     paid: orders.filter(order => order.paymentStatus === "aprovado").length,
-    delivered: orders.filter(order => order.status === "entregue").length,
+    pending: orders.length,
   }), [orders]);
 
   const handleRateProduct = async (order: CustomerOrder, item: OrderItemDraft, rating: number) => {
@@ -302,8 +302,8 @@ const MyOrders = () => {
             <p className="mt-2 font-display text-3xl text-green-700">{totals.paid}</p>
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-sm font-bold text-muted-foreground">Entregues</p>
-            <p className="mt-2 font-display text-3xl text-primary">{totals.delivered}</p>
+            <p className="text-sm font-bold text-muted-foreground">Pendentes</p>
+            <p className="mt-2 font-display text-3xl text-primary">{totals.pending}</p>
           </div>
         </div>
 
@@ -337,7 +337,7 @@ const MyOrders = () => {
                         {order.items.map((item, index) => {
                           const ratingKey = `${order.id}:${item.productId}`;
                           const currentRating = ratings[ratingKey] ?? 0;
-                          const canRate = order.status === "entregue";
+                          const canRate = false;
 
                           return (
                           <div key={`${order.id}-${item.productId}-${index}`} className="rounded-md bg-muted/50 px-3 py-2 text-sm">
@@ -386,12 +386,9 @@ const MyOrders = () => {
                       {order.paymentStatus === "aprovado" ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
                       {order.paymentStatus === "aprovado" ? "Pago" : "Pagamento pendente"}
                     </span>
-                    <span className={order.status === "entregue"
-                      ? "inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary"
-                      : "inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-sm font-bold text-muted-foreground"}
-                    >
+                    <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-sm font-bold text-muted-foreground">
                       <Truck className="h-4 w-4" />
-                      {order.status === "entregue" ? "Entregue" : "Em preparo"}
+                      Em preparo
                     </span>
                   </div>
                 </div>

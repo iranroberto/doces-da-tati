@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, Bell, CheckCircle2, ClipboardList, Clock, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, Save, Send, ShieldCheck, Store, Tags, Trash2, TrendingUp, Truck, Users, Wallet } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, CheckCircle2, ClipboardList, Clock, DollarSign, Image, Instagram, KeyRound, LogOut, Package, Pencil, Plus, Save, Send, ShieldCheck, Store, Tags, Trash2, TrendingUp, Users, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Category, Customer, Product } from "@/types/store";
@@ -274,7 +274,6 @@ const AdminDashboard = () => {
   const [sendingPush, setSendingPush] = useState(false);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
-  const [updatingOrderStatusId, setUpdatingOrderStatusId] = useState("");
   const [verifyingPaymentId, setVerifyingPaymentId] = useState("");
   const [deletingOrderId, setDeletingOrderId] = useState("");
   const lastPaymentSyncById = useRef(new Map<string, number>());
@@ -656,14 +655,6 @@ const AdminDashboard = () => {
     orders.reduce((sum, order) => sum + order.total, 0)
   ), [orders]);
 
-  const deliveryPendingOrders = useMemo(() => (
-    orders.filter(order => order.status !== "entregue")
-  ), [orders]);
-
-  const deliveredOrders = useMemo(() => (
-    orders.filter(order => order.status === "entregue")
-  ), [orders]);
-
   const pendingPaymentOrders = useMemo(() => (
     orders.filter(order => (
       order.paymentMethod === "pix"
@@ -1027,38 +1018,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const toggleOrderDeliveryStatus = async (order: AdminOrder) => {
-    const nextStatus = order.status === "entregue" ? "aberto" : "entregue";
-    setUpdatingOrderStatusId(order.id);
-
-    try {
-      const response = await fetch("/api/order-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: order.id,
-          status: nextStatus,
-          adminPassword: adminPw,
-        }),
-      });
-      const result = await readApiJson(response);
-
-      if (!response.ok) {
-        throw new Error(apiErrorMessage(result, "Nao foi possivel atualizar o pedido."));
-      }
-
-      setOrders(current => current.map(item => (
-        item.id === order.id ? { ...item, status: nextStatus } : item
-      )));
-      toast.success(nextStatus === "entregue" ? "Pedido marcado como entregue." : "Pedido marcado como pendente.");
-    } catch (error) {
-      console.error("Erro ao atualizar status do pedido:", error);
-      toast.error("Nao foi possivel atualizar o pedido.");
-    } finally {
-      setUpdatingOrderStatusId("");
-    }
-  };
-
   const handleDeleteOrder = async (order: AdminOrder) => {
     const confirmed = window.confirm(`Apagar o pedido de ${order.customerName} no valor de ${formatPrice(order.total)}?`);
     if (!confirmed) return;
@@ -1086,7 +1045,7 @@ const AdminDashboard = () => {
     { label: "Pedidos hoje", value: String(todaysOrders.length), detail: `${orders.length} no total`, icon: ClipboardList },
     { label: "Faturamento pago", value: formatPrice(approvedRevenue), detail: `${formatPrice(totalRevenue)} em pedidos`, icon: DollarSign },
     { label: "Ticket medio", value: formatPrice(averageTicket), detail: orders.length ? "media por pedido" : "sem pedidos ainda", icon: TrendingUp },
-    { label: "A entregar", value: String(deliveryPendingOrders.length), detail: `${deliveredOrders.length} entregue(s)`, icon: Truck },
+    { label: "Pedidos pendentes", value: String(orders.length), detail: "em preparo", icon: ClipboardList },
     { label: "Pagamentos pendentes", value: String(pendingPaymentOrders.length), detail: "aguardando confirmacao", icon: Clock },
     { label: "Clientes", value: String(customers.length), detail: `${activeProducts.length} produto(s) ativos`, icon: Users },
   ];
@@ -1219,8 +1178,8 @@ const AdminDashboard = () => {
                   </div>
                   <div className="rounded-lg border border-[#603000] bg-[#220b00]/45 p-4">
                     <p className="text-xs font-bold uppercase text-[#d8c0a8]">Pedidos pendentes</p>
-                    <p className="mt-1 font-display text-3xl text-yellow-200">{deliveryPendingOrders.length}</p>
-                    <p className="mt-1 text-sm font-semibold text-[#d8c0a8]">aguardando entrega</p>
+                    <p className="mt-1 font-display text-3xl text-yellow-200">{orders.length}</p>
+                    <p className="mt-1 text-sm font-semibold text-[#d8c0a8]">em preparo</p>
                   </div>
                 </div>
               </section>
@@ -1254,8 +1213,8 @@ const AdminDashboard = () => {
                         <span className="font-bold">{formatDateTime(order.createdAt)}</span>
                         <span>{order.customerName}</span>
                         <span className="font-bold text-[#f0d8a8]">{formatPrice(order.total)}</span>
-                        <span className={order.status === "entregue" ? "font-bold text-green-300" : "font-bold text-yellow-200"}>
-                          {order.status === "entregue" ? "Entregue" : "Pendente"}
+                        <span className="font-bold text-yellow-200">
+                          Pendente
                         </span>
                       </div>
                     ))}
@@ -1663,12 +1622,11 @@ const AdminDashboard = () => {
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
                 <h1 className="font-display text-4xl text-[#f0d8c0]">Pedidos</h1>
-                <p className="text-sm font-semibold text-[#d8c0a8]">Pedidos organizados por cliente, valor, data e entrega.</p>
+                <p className="text-sm font-semibold text-[#d8c0a8]">Pedidos organizados por cliente, valor e data.</p>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
                 <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{orders.length} pedido(s)</span>
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-green-300">{orders.filter(order => order.status === "entregue").length} entregue(s)</span>
-                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{orders.filter(order => order.status !== "entregue").length} a entregar</span>
+                <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-yellow-200">{orders.length} pendente(s)</span>
                 <span className="rounded-lg border border-[#603000] bg-[#481800] px-3 py-2 font-bold text-[#f0d8a8]">{pendingPaymentOrders.length} pagamento(s) pendente(s)</span>
               </div>
             </div>
@@ -1693,14 +1651,12 @@ const AdminDashboard = () => {
                         </p>
                       </div>
                       <span className="w-fit rounded-full bg-[#f0d8c0] px-3 py-1 text-sm font-bold text-[#481800]">
-                        {group.orders.filter(order => order.status === "entregue").length}/{group.orders.length} entregue(s)
+                        {group.orders.length} pendente(s)
                       </span>
                     </div>
 
                     <div className="divide-y divide-[#603000]">
                       {group.orders.map(order => {
-                        const delivered = order.status === "entregue";
-
                         return (
                           <article key={order.id} className="grid grid-cols-1 gap-3 px-5 py-4 text-sm text-[#f0d8c0] lg:grid-cols-[1fr_1.5fr_0.8fr_1fr_1.1fr_auto] lg:items-center">
                             <div>
@@ -1724,8 +1680,8 @@ const AdminDashboard = () => {
                             </div>
                             <div className="min-w-0">
                               <p className="text-xs font-bold uppercase text-[#d8c0a8]">Pedido</p>
-                              <p className={delivered ? "font-bold text-green-300" : "font-bold text-yellow-200"}>
-                                {delivered ? "Entregue" : "Pendente de entrega"}
+                              <p className="font-bold text-yellow-200">
+                                Pendente
                               </p>
                               {order.transactionId && <p className="break-all text-xs text-[#d8c0a8]">Transacao: {order.transactionId}</p>}
                             </div>
@@ -1733,20 +1689,8 @@ const AdminDashboard = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className={delivered
-                                  ? "w-full gap-2 border-yellow-300 bg-transparent text-yellow-100 hover:bg-yellow-950/40 hover:text-yellow-50"
-                                  : "w-full gap-2 border-green-300 bg-transparent text-green-100 hover:bg-green-950/40 hover:text-green-50"}
-                                disabled={updatingOrderStatusId === order.id || deletingOrderId === order.id}
-                                onClick={() => void toggleOrderDeliveryStatus(order)}
-                              >
-                                {delivered ? <ClipboardList className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
-                                {delivered ? "Marcar pendente" : "Marcar entregue"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
                                 className="w-full gap-2 border-red-300 bg-transparent text-red-200 hover:bg-red-950/40 hover:text-red-100"
-                                disabled={deletingOrderId === order.id || updatingOrderStatusId === order.id}
+                                disabled={deletingOrderId === order.id}
                                 onClick={() => void handleDeleteOrder(order)}
                               >
                                 <Trash2 className="h-4 w-4" />
