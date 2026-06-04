@@ -10,6 +10,7 @@ export const json = (body, status = 200) =>
     headers: {
       ...corsHeaders,
       "Content-Type": "application/json",
+      "Cache-Control": "no-store",
     },
   });
 

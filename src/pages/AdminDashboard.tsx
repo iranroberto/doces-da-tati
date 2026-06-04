@@ -435,7 +435,7 @@ const AdminDashboard = () => {
     let isMounted = true;
     setMpSettingsLoading(true);
 
-    fetch("/api/mercado-pago-settings")
+    fetch(`/api/mercado-pago-settings?ts=${Date.now()}`, { cache: "no-store" })
       .then(response => readApiJson(response))
       .then(result => {
         if (!isMounted) return;
@@ -791,7 +791,7 @@ const AdminDashboard = () => {
         throw new Error(apiErrorMessage(result, "Nao foi possivel salvar as credenciais."));
       }
 
-      const refreshed = await fetch("/api/mercado-pago-settings");
+      const refreshed = await fetch(`/api/mercado-pago-settings?ts=${Date.now()}`, { cache: "no-store" });
       const refreshedResult = await readApiJson(refreshed);
 
       setMpSettings({
