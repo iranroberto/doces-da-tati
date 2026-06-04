@@ -167,42 +167,69 @@ const MyOrders = () => {
       return mergeOrders(mapOrderRows(result.data ?? []), localOrders);
     };
 
-    loadOrders()
-      .then(nextOrders => {
-        if (!isMounted) return;
+    const applyOrders = (nextOrders: CustomerOrder[]) => {
+      if (!isMounted) return;
 
-        setOrders(nextOrders);
-        nextOrders
-          .filter(order => order.paymentStatus === "aprovado" && order.id && order.transactionId)
-          .forEach(order => {
-            updateOrderPayment(order.id, {
-              paymentMethod: order.paymentMethod,
-              paymentStatus: "aprovado",
-              transactionId: order.transactionId,
-              paidAt: order.paidAt,
-            }).catch(error => {
-              console.error("Erro ao sincronizar pagamento aprovado:", error);
-            });
-          });
-        const nextRatings: Record<string, number> = {};
-        nextOrders.forEach(order => {
-          order.items.forEach(item => {
-            const localRating = getLocalRating(order.id, item.productId, customer.id);
-            if (localRating) nextRatings[`${order.id}:${item.productId}`] = localRating.rating;
+      setOrders(nextOrders);
+      nextOrders
+        .filter(order => order.paymentStatus === "aprovado" && order.id && order.transactionId)
+        .forEach(order => {
+          updateOrderPayment(order.id, {
+            paymentMethod: order.paymentMethod,
+            paymentStatus: "aprovado",
+            transactionId: order.transactionId,
+            paidAt: order.paidAt,
+          }).catch(error => {
+            console.error("Erro ao sincronizar pagamento aprovado:", error);
           });
         });
-        setRatings(nextRatings);
-      })
-      .catch(error => {
-        console.error("Erro ao carregar pedidos do cliente:", error);
-        if (isMounted) setOrders(localOrdersForCustomer(customer.id, customer.telefone));
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
+
+      const nextRatings: Record<string, number> = {};
+      nextOrders.forEach(order => {
+        order.items.forEach(item => {
+          const localRating = getLocalRating(order.id, item.productId, customer.id);
+          if (localRating) nextRatings[`${order.id}:${item.productId}`] = localRating.rating;
+        });
       });
+      setRatings(nextRatings);
+    };
+
+    const refreshOrders = () => {
+      loadOrders()
+        .then(applyOrders)
+        .catch(error => {
+          console.error("Erro ao carregar pedidos do cliente:", error);
+          if (isMounted) setOrders(localOrdersForCustomer(customer.id, customer.telefone));
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+    };
+
+    refreshOrders();
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) refreshOrders();
+    };
+    window.addEventListener("focus", refreshOrders);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const ordersChannel = supabase && isSupabaseConfigured
+      ? supabase
+        .channel(`customer-orders-${customer.id}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "pedidos", filter: `cliente_id=eq.${customer.id}` },
+          refreshOrders,
+        )
+        .subscribe()
+      : null;
 
     return () => {
       isMounted = false;
+      window.removeEventListener("focus", refreshOrders);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (ordersChannel) void supabase?.removeChannel(ordersChannel);
     };
   }, [customer, isCustomerLoading]);
 
